@@ -1,0 +1,16 @@
+Android Credentials     
+Project                 iraq-call
+Application Identifier  com.sameer_jabar.iraqcall
+
+Push Notifications (FCM Legacy)
+  None assigned yet
+
+Push Notifications (FCM V1): Google Service Account Key For FCM V1       
+Project ID      callapp-notifications
+Client Email    firebase-adminsdk-fbsvc@callapp-notifications.iam.gserviceaccount.com
+Client ID       102567184793813328921
+Private Key ID  89d50b0611c2390883addbb0086c31473d92e131
+Updated         6 minutes ago
+
+Submissions: Google Service Account Key for Play Store Submissions       
+  None assigned yet

@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Iraq Call",
+    "slug": "iraq-call",
+    "scheme": "callapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "supportsRtl": true,
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.sameer_jabar.iraqcall"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "5840bcfc-eaa3-49ed-ad79-66e65bee179d"
+      }
+    },
+    "owner": "sameer_jabar"
+  }
+}

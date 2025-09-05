@@ -1,0 +1,33 @@
+/* Global styles for the chat application */
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  margin: auto;
+}
+
+/* Chat app color scheme */
+.primary-green {
+  color: #25D366;
+}
+
+.secondary-gray {
+  color: #666;
+}
+
+.text-dark {
+  color: #333;
+}
+
+.bg-primary {
+  background-color: #25D366;
+}
+
+.bg-light {
+  background-color: #f0f0f0;
+}
