@@ -1,38 +1,42 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal } from 'react-native';
+import { Modal, View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 
 export default function SearchUserModal({ visible, onClose }) {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  // افترض نتائج وهمية هنا، يمكن ربطها بـ API لاحقاً
+  const fakeUsers = [
+    { id: '1', name: 'أحمد' },
+    { id: '2', name: 'سارة' },
+    { id: '3', name: 'محمد' }
+  ];
+
+  const handleSearch = () => {
+    setResults(fakeUsers.filter(u => u.name.includes(query)));
+  };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.overlay}>
-        <View style={styles.modalBox}>
+        <View style={styles.box}>
           <Text style={styles.title}>بحث عن مستخدم</Text>
           <TextInput
             style={styles.input}
-            placeholder="البريد الإلكتروني أو اسم المستخدم."
+            placeholder="اكتب اسم المستخدم"
             value={query}
             onChangeText={setQuery}
-            textAlign="right"
           />
-          <TouchableOpacity style={styles.searchBtn}>
-            <Text style={styles.searchText}>بحث</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.searchBtn}>
-            <Text style={styles.searchText}>بواسطة QR من الاستوديو</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.searchBtn}>
-            <Text style={styles.searchText}>افتح كاميرا لقراءة QR</Text>
-          </TouchableOpacity>
-          <View style={styles.row}>
-            <TouchableOpacity style={styles.okBtn}>
-              <Text style={styles.okText}>موافق</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>إلغاء</Text>
-            </TouchableOpacity>
-          </View>
+          <Button title="بحث" onPress={handleSearch} />
+          <FlatList
+            data={results}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.result}>
+                <Text>{item.name}</Text>
+              </TouchableOpacity>
+            )}
+          />
+          <Button title="إغلاق" onPress={onClose} />
         </View>
       </View>
     </Modal>
@@ -40,15 +44,9 @@ export default function SearchUserModal({ visible, onClose }) {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.14)', justifyContent: 'center', alignItems: 'center' },
-  modalBox: { backgroundColor: '#fff', borderRadius: 16, padding: 18, width: '86%', elevation: 6 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#222', textAlign: 'center', marginBottom: 12, fontFamily: 'Cairo' },
-  input: { backgroundColor: '#f8f8f8', borderRadius: 12, paddingHorizontal: 14, fontSize: 15, marginBottom: 8, borderWidth: 1, borderColor: '#eee' },
-  searchBtn: { backgroundColor: '#388e3c', borderRadius: 8, paddingVertical: 11, marginHorizontal: 4, marginBottom: 8, alignItems: 'center' },
-  searchText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  row: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 8 },
-  okBtn: { backgroundColor: '#388e3c', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 22, marginRight: 4 },
-  okText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  cancelBtn: { backgroundColor: '#eee', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 22, marginLeft: 4 },
-  cancelText: { color: '#222', fontSize: 16, fontWeight: '600' },
+  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  box: { width: '85%', backgroundColor: '#fff', padding: 20, borderRadius: 12 },
+  title: { fontSize: 20, marginBottom: 10, color: '#388e3c' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 8, marginBottom: 10 },
+  result: { padding: 10, borderBottomWidth: 1, borderColor: '#eee' }
 });

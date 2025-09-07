@@ -1,18 +1,25 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
 
-export default function LoginScreen({ navigation }) {
+export default function SignupScreen({ navigation }) {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    // منطق تسجيل الدخول هنا
+  const handleSignup = () => {
+    // منطق إنشاء الحساب هنا
     navigation.navigate('Contacts');
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>تسجيل الدخول</Text>
+      <Text style={styles.title}>إنشاء حساب جديد</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="اسم المستخدم"
+        value={username}
+        onChangeText={setUsername}
+      />
       <TextInput
         style={styles.input}
         placeholder="البريد الإلكتروني"
@@ -26,8 +33,8 @@ export default function LoginScreen({ navigation }) {
         value={password}
         onChangeText={setPassword}
       />
-      <Button title="دخول" onPress={handleLogin} />
-      <Button title="إنشاء حساب جديد" onPress={() => navigation.navigate('Signup')} />
+      <Button title="تسجيل" onPress={handleSignup} />
+      <Button title="لديك حساب؟ سجل دخول" onPress={() => navigation.navigate('Login')} />
     </View>
   );
 }
