@@ -1,5 +1,6 @@
--- Final corrected version of get_user_conversations (v4)
--- This version includes DROP FUNCTION to handle the return type change, and has the correct data types.
+
+-- تطبيق تعديل على دالة جلب المحادثات لاستبعاد المحادثات المؤرشفة
+-- هذا التعديل يضمن أن المحادثات المؤرشفة لا تظهر في قائمة المحادثات الرئيسية
 
 -- Drop the old function first to allow changing the return type
 DROP FUNCTION IF EXISTS public.get_user_conversations(UUID);
@@ -63,5 +64,5 @@ GRANT EXECUTE ON FUNCTION public.get_user_conversations(UUID) TO service_role;
 -- Verification
 DO $$
 BEGIN
-    RAISE NOTICE 'Function get_user_conversations(UUID) has been recreated successfully (v4).';
+    RAISE NOTICE 'Function get_user_conversations(UUID) has been updated to exclude archived conversations.';
 END $$;

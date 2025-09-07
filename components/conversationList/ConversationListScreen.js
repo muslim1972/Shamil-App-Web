@@ -44,8 +44,20 @@ export default function ConversationListScreen({ navigation }) {
       // إعداد Realtime
       const cleanupRealtime = setupRealtime();
 
+      // الاستماع إلى حدث إلغاء الأرشفة
+      const handleUnarchiveEvent = () => {
+        fetchConversations();
+      };
+
+      // إضافة مستمع الحدث باستخدام DeviceEventEmitter
+      const { DeviceEventEmitter } = require('react-native');
+      const subscription = DeviceEventEmitter.addListener('conversationUnarchived', handleUnarchiveEvent);
+
       // دالة التنظيف
-      return cleanupRealtime;
+      return () => {
+        cleanupRealtime();
+        subscription.remove();
+      };
     }, [userId, fetchConversations, setIsLoading, setupRealtime])
   );
 

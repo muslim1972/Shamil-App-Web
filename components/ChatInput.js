@@ -53,7 +53,7 @@ const ChatInput = ({
         onChangeText={setNewMessage}
         placeholder={placeholderText}
         multiline
-        editable={!isRecordingAudio}
+        editable={true}
         autoFocus={!isRecordingAudio}
       />
       {showSendButton ? (

@@ -1,10 +1,12 @@
 import { useState, useCallback } from "react";
 import { Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext'; // استيراد useAuth
 
 export const useArchivedConversationsActions = (conversations, setConversations, fetchArchivedConversations) => {
   const { user } = useAuth(); // الحصول على المستخدم الحالي
+  const navigation = useNavigation();
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
@@ -13,14 +15,11 @@ export const useArchivedConversationsActions = (conversations, setConversations,
     if (!user) return; // التأكد من وجود المستخدم
     setIsActionMenuVisible(false); // إغلاق القائمة
     setIsProcessing(true);
-    const { error } = await supabase
-      .from('user_conversation_settings')
-      .upsert({
-        user_id: user.id,
-        conversation_id: conversationId,
-        is_archived: true,
-        archived_at: new Date().toISOString()
-      }, { onConflict: ['user_id', 'conversation_id'] });
+
+    // استخدام دالة archive_conversation الموجودة في قاعدة البيانات
+    const { error } = await supabase.rpc('archive_conversation', { 
+      p_conversation_id: conversationId 
+    });
 
     if (error) {
       Alert.alert("خطأ", "لم نتمكن من أرشفة المحادثة.");
@@ -36,14 +35,11 @@ export const useArchivedConversationsActions = (conversations, setConversations,
     if (!user) return; // التأكد من وجود المستخدم
     setIsActionMenuVisible(false); // إغلاق القائمة
     setIsProcessing(true);
-    const { error } = await supabase
-      .from('user_conversation_settings')
-      .upsert({
-        user_id: user.id,
-        conversation_id: conversationId,
-        is_archived: false,
-        archived_at: null
-      }, { onConflict: ['user_id', 'conversation_id'] });
+
+    // استخدام دالة unarchive_conversation الموجودة في قاعدة البيانات
+    const { error } = await supabase.rpc('unarchive_conversation', { 
+      p_conversation_id: conversationId 
+    });
 
     if (error) {
       Alert.alert("خطأ", "لم نتمكن من إلغاء أرشفة المحادثة.");
@@ -51,6 +47,14 @@ export const useArchivedConversationsActions = (conversations, setConversations,
     } else {
       // إعادة جلب المحادثات المؤرشفة لتحديث الواجهة
       fetchArchivedConversations();
+
+      // إعلام واجهة المحادثات الرئيسية بوجود تحديث
+      // نستخدم DeviceEventEmitter لإعلام الشاشة الرئيسية بوجود تحديث
+      const { DeviceEventEmitter } = require('react-native');
+      DeviceEventEmitter.emit('conversationUnarchived');
+
+      // العودة إلى شاشة المحادثات الرئيسية بعد إلغاء الأرشفة بنجاح
+      navigation.goBack();
     }
     setIsProcessing(false);
   };

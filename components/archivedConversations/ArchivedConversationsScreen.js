@@ -44,6 +44,17 @@ export default function ArchivedConversationsScreen({ navigation }) {
     }, [navigation, isActionMenuVisible, closeActionMenu])
   );
 
+  // تحديث قائمة المحادثات الرئيسية عند مغادرة شاشة المحادثات المؤرشفة
+  useFocusEffect(
+    useCallback(() => {
+      // سيتم تحديث قائمة المحادثات الرئيسية عند العودة من هذه الشاشة
+      // من خلال useFocusEffect في شاشة المحادثات الرئيسية
+      return () => {
+        // لا حاجة لفعل شيء هنا، سيتم تحديث الشاشة الرئيسية عند العودة
+      };
+    }, [])
+  );
+
   // جلب المحادثات عند التركيز على الشاشة
   useFocusEffect(
     useCallback(() => {

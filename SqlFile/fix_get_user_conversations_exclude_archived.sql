@@ -1,10 +1,11 @@
--- Final corrected version of get_user_conversations (v4)
--- This version includes DROP FUNCTION to handle the return type change, and has the correct data types.
 
--- Drop the old function first to allow changing the return type
+-- تعديل دالة get_user_conversations لاستبعاد المحادثات المؤرشفة
+-- هذا التعديل يضمن أن المحادثات المؤرشفة لا تظهر في قائمة المحادثات الرئيسية
+
+-- حذف الدالة الحالية
 DROP FUNCTION IF EXISTS public.get_user_conversations(UUID);
 
--- Recreate the function with the correct return types
+-- إعادة إنشاء الدالة مع التعديل المطلوب
 CREATE OR REPLACE FUNCTION public.get_user_conversations(p_user_id UUID)
 RETURNS TABLE (
     id UUID,
@@ -49,19 +50,19 @@ BEGIN
         LEFT JOIN last_messages lm ON lm.conversation_id = c.id AND lm.rn = 1
     WHERE
         c.participants @> ARRAY[p_user_id]
-        AND ucs.is_hidden = FALSE
-        AND (ucs.is_archived IS NULL OR ucs.is_archived = FALSE)
+        AND (ucs.is_hidden = FALSE OR lm.last_message_created_at > ucs.hidden_at)
+        AND (ucs.is_archived IS NULL OR ucs.is_archived = FALSE)  -- إضافة شرط لاستبعاد المحادثات المؤرشفة
     ORDER BY
         COALESCE(lm.last_message_created_at, c.updated_at) DESC NULLS LAST;
 END;
 $$ LANGUAGE plpgsql;
 
--- Grant permissions
+-- منح الصلاحيات اللازمة
 GRANT EXECUTE ON FUNCTION public.get_user_conversations(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_conversations(UUID) TO service_role;
 
--- Verification
+-- التحقق من إنشاء الدالة بنجاح
 DO $$
 BEGIN
-    RAISE NOTICE 'Function get_user_conversations(UUID) has been recreated successfully (v4).';
+    RAISE NOTICE 'Function get_user_conversations(UUID) has been updated to exclude archived conversations.';
 END $$;

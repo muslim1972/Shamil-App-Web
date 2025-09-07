@@ -20,11 +20,8 @@ export const useConversationListActions = (conversations, setConversations, fetc
       } else {
         // تحديث الواجهة فوراً بدلاً من انتظار إعادة الجلب
         if (operationType === 'archive' || operationType === 'hide') {
-          if (setConversations && typeof setConversations === 'function') {
-            setConversations(prev => prev.filter(c => c.id !== selectedConversation.id));
-          } else {
-            await fetchConversations(); // استخدام fetchConversations كبديل
-          }
+          // دائماً قم بإعادة جلب المحادثات لضمان التحديث الصحيح
+          await fetchConversations();
         } else {
           await fetchConversations(); // إعادة الجلب للحالات الأخرى
         }
