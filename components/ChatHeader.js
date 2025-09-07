@@ -15,9 +15,7 @@ const ChatHeader = ({ conversationDetails, onStartRecording }) => {
         {conversationDetails?.name || 'محادثة'}
       </Text>
       <View style={styles.rightContainer}>
-        <TouchableOpacity onPress={onStartRecording} style={styles.actionButton}>
-          <MaterialIcons name="mic" size={24} color="white" />
-        </TouchableOpacity>
+        {/* تم نقل أيقونة المايكروفون إلى حقل الكتابة */}
       </View>
     </View>
   );

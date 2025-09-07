@@ -1,14 +1,15 @@
 import React from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-const ChatInput = ({ 
-  newMessage, 
-  setNewMessage, 
-  handleSendMessage, 
-  onPickMedia, 
-  isSending, 
-  isUploading, 
-  isRecordingAudio 
+const ChatInput = ({
+  newMessage,
+  setNewMessage,
+  handleSendMessage,
+  onPickMedia,
+  onStartRecording,
+  isSending,
+  isUploading,
+  isRecordingAudio
 }) => {
   // --- [تحسين] منطق واضح ومحدد لحالة الزر والنص المؤقت ---
 
@@ -26,18 +27,22 @@ const ChatInput = ({
   const placeholderText = isRecordingAudio ? "اكتب تعليقاً للمقطع الصوتي..." : "اكتب رسالتك...";
   // [جديد] 3. تحديد حالة زر الإرفاق
   const isAttachmentDisabled = isUploading || isRecordingAudio;
+  // [جديد] 4. تحديد حالة زر التسجيل
+  const isRecordingDisabled = isUploading || isRecordingAudio || newMessage.trim().length > 0;
+  // [جديد] 5. تحديد ما إذا كان يجب إظهار زر الإرسال بدلاً من زر التسجيل
+  const showSendButton = newMessage.trim().length > 0 || isSending;
   return (
     <View style={styles.inputContainer}>
-      <TouchableOpacity 
-        onPress={onPickMedia} 
-        style={styles.iconButton} 
+      <TouchableOpacity
+        onPress={onPickMedia}
+        style={styles.iconButton}
         disabled={isAttachmentDisabled}
       >
         {isUploading ? (
           <ActivityIndicator size="small" color="#128C7E" />
         ) : (
-          <MaterialIcons 
-            name="attachment" size={24} 
+          <MaterialIcons
+            name="attachment" size={24}
             color={isAttachmentDisabled ? '#BDBDBD' : '#555'} // لون رمادي باهت عند التعطيل
             style={{ transform: [{ rotate: '45deg' }] }} />
         )}
@@ -48,14 +53,26 @@ const ChatInput = ({
         onChangeText={setNewMessage}
         placeholder={placeholderText}
         multiline
+        editable={!isRecordingAudio}
+        autoFocus={!isRecordingAudio}
       />
-      <TouchableOpacity 
-        onPress={handleSendMessage} 
-        style={[styles.sendButton, isSendDisabled && styles.disabledButton]} 
-        disabled={isSendDisabled}
-      >
-        <MaterialIcons name="send" size={24} color="white" />
-      </TouchableOpacity>
+      {showSendButton ? (
+        <TouchableOpacity
+          onPress={handleSendMessage}
+          style={[styles.sendButton, isSendDisabled && styles.disabledButton]}
+          disabled={isSendDisabled}
+        >
+          <MaterialIcons name="send" size={24} color="white" />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={onStartRecording}
+          style={[styles.sendButton, isRecordingDisabled && styles.disabledButton]}
+          disabled={isRecordingDisabled}
+        >
+          <MaterialIcons name="mic" size={24} color="white" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

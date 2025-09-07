@@ -37,8 +37,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#128C7E', // لون داكن متناسق مع شريط التحديد
     paddingVertical: 10,
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 40 : 50,
-    paddingBottom: 15,
+    // إزالة الحشوة العلوية الكبيرة لجعله ملاصقاً لحقل الكتابة
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#DDD',
   },
   button: {
     padding: 5,

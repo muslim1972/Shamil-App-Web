@@ -9,6 +9,7 @@ import {
   Platform,
   Text,
   BackHandler,
+  Keyboard,
 } from 'react-native';
 import { useRoute, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
@@ -146,6 +147,9 @@ export default function ChatScreen() {
   // --- دوال التعامل مع تسجيل الصوت ---
   const handleStartRecording = async () => {
     try {
+      // إزالة إخفاء لوحة المفاتيح عند بدء التسجيل
+      // Keyboard.dismiss();
+
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('عذراً', 'نحتاج إلى إذن الوصول إلى الميكروفون لتسجيل الصوت.');
@@ -220,7 +224,7 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {isSelectionMode ? (
@@ -232,14 +236,8 @@ export default function ChatScreen() {
           onCopy={handleCopyMessages}
           onForward={handleForwardMessages}
         />
-      ) : isRecording ? (
-        <RecordingHeader
-          duration={recordingDuration}
-          onCancel={handleCancelRecording}
-          onSend={handleSendRecording}
-        />
       ) : (
-        <ChatHeader conversationDetails={conversationDetails} onStartRecording={handleStartRecording} />
+        <ChatHeader conversationDetails={conversationDetails} />
       )}
       <FlatList
         ref={flatListRef}
@@ -249,7 +247,7 @@ export default function ChatScreen() {
         style={styles.messageList}
         contentContainerStyle={styles.messageListContent}
         // [تعديل] التمرير عند تغيير حجم المحتوى (للرسائل النصية والتحميل الأولي)
-        onContentSizeChange={scrollToBottom} 
+        onContentSizeChange={scrollToBottom}
         ListEmptyComponent={() => (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>لا توجد رسائل. ابدأ المحادثة!</Text>
@@ -257,15 +255,25 @@ export default function ChatScreen() {
         )}
       />
       {!isSelectionMode && (
-        <ChatInput
-          newMessage={newMessageText}
-          setNewMessage={setNewMessageText}
-          handleSendMessage={onSend}
-          onPickMedia={(mediaType) => pickAndSendMedia(mediaType, scrollToBottom)} // [تعديل] تمرير دالة التمرير
-          isSending={isSending || isSendingAudio}
-          isUploading={isUploading}
-          isRecordingAudio={isRecording} 
-        />
+        <View>
+          {isRecording && (
+            <RecordingHeader
+              duration={recordingDuration}
+              onCancel={handleCancelRecording}
+              onSend={handleSendRecording}
+            />
+          )}
+          <ChatInput
+            newMessage={newMessageText}
+            setNewMessage={setNewMessageText}
+            handleSendMessage={onSend}
+            onPickMedia={(mediaType) => pickAndSendMedia(mediaType, scrollToBottom)} // [تعديل] تمرير دالة التمرير
+            onStartRecording={handleStartRecording}
+            isSending={isSending || isSendingAudio}
+            isUploading={isUploading}
+            isRecordingAudio={isRecording}
+          />
+        </View>
       )}
       <ImageViewer
         imageUrl={viewingImage}
