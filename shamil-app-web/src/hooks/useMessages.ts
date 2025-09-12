@@ -35,7 +35,7 @@ export const useMessages = (conversationId: string) => {
       }));
 
       const messagesWithUrls = await Promise.all(
-        formattedMessages.map(async (message: any) => {
+        formattedMessages.map(async (message: Message) => {
           if ((message.message_type === 'image' || message.message_type === 'video' || message.message_type === 'audio') && message.text) {
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
               .from('call-files')
@@ -78,10 +78,10 @@ export const useMessages = (conversationId: string) => {
       if (!user) throw new Error('المستخدم غير مسجل الدخول');
 
       const fileExt = file.name.split('.').pop();
-      const uniqueFileName = `${Date.now()}_${conversationId}.${fileExt}`;
+      const uniqueFileName = `${user.id}/${Date.now()}_${conversationId}.${fileExt}`;
       const filePath = `public/${uniqueFileName}`;
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('call-files')
         .upload(filePath, file, {
           contentType: file.type,
@@ -92,7 +92,8 @@ export const useMessages = (conversationId: string) => {
         throw uploadError;
       }
 
-      return data.path;
+      return filePath;
+
     } catch (error) {
       console.error('Error uploading file:', error);
       return null;
@@ -106,43 +107,51 @@ export const useMessages = (conversationId: string) => {
     if (!file) return;
 
     try {
+      // Step 1: Upload the file
       const filePath = await uploadFile(file, messageType);
+      if (!filePath) throw new Error('File upload failed to return a path.');
 
-      if (filePath) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('المستخدم غير مسجل الدخول');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not logged in');
 
-        const { data, error: insertError } = await supabase
-          .from('messages')
-          .insert([
-            {
-              conversation_id: String(conversationId),
-              content: String(filePath),
-              sender_id: String(user.id),
-              message_type: String(messageType),
-            }
-          ]).select('*');
+      // Step 2: Insert the message record into the database
+      const { data: insertedData, error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          content: filePath,
+          sender_id: user.id,
+          message_type: messageType,
+        })
+        .select()
+        .single();
 
-        if (insertError) throw insertError;
+      if (insertError) throw insertError;
 
-        if (data && data.length > 0) {
-          const newMessage = {
-            id: data[0].id,
-            conversationId: data[0].conversation_id,
-            text: data[0].content,
-            senderId: data[0].sender_id,
-            timestamp: new Date().toISOString(),
-            message_type: data[0].message_type,
-            signedUrl: null,
-          };
-          const { data: signedUrlData } = await supabase.storage.from('call-files').createSignedUrl(newMessage.text, 3600);
-          newMessage.signedUrl = signedUrlData?.signedUrl || null;
-          setMessages(currentMessages => [...currentMessages, newMessage]);
-        }
-      }
+      // Step 3: Get the signed URL for the newly uploaded file
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('call-files')
+        .createSignedUrl(filePath, 3600);
+
+      if (signedUrlError) throw signedUrlError;
+
+      // Step 4: Create the final message object with all data
+      const newMessage: Message = {
+        id: insertedData.id,
+        conversationId: insertedData.conversation_id,
+        text: insertedData.content,
+        senderId: insertedData.sender_id,
+        timestamp: new Date(insertedData.created_at).toISOString(),
+        message_type: insertedData.message_type,
+        signedUrl: signedUrlData.signedUrl,
+      };
+
+      // Step 5: Update the UI once with the complete message object
+      setMessages(currentMessages => [...currentMessages, newMessage]);
+
     } catch (error) {
       console.error(`Error sending ${messageType} message:`, error);
-      throw error;
+      alert(`فشل إرسال الملف: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
     }
   };
 
@@ -172,13 +181,14 @@ export const useMessages = (conversationId: string) => {
       }
 
       if (data && data.length > 0) {
-        const newMessage = {
+        const newMessage: Message = {
           id: data[0].id,
           conversationId: data[0].conversation_id,
           text: data[0].content,
           senderId: data[0].sender_id,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date(data[0].created_at).toISOString(),
           message_type: data[0].message_type,
+          signedUrl: null
         };
         setMessages(currentMessages => [...currentMessages, newMessage]);
       }
@@ -230,16 +240,36 @@ export const useMessages = (conversationId: string) => {
         table: 'messages',
         filter: `conversation_id=eq.${conversationId}`
       }, async (payload: any) => {
-        const newMessage = payload.new;
-        if (newMessage.sender_id === (await supabase.auth.getUser()).data.user?.id) {
+        const rawMessage = payload.new;
+
+        const {data: {user}} = await supabase.auth.getUser();
+        if (rawMessage.sender_id === user?.id) {
           return;
         }
 
-        if ((newMessage.message_type === 'image' || newMessage.message_type === 'video' || newMessage.message_type === 'audio') && newMessage.content) {
-          const { data: signedUrlData } = await supabase.storage.from('call-files').createSignedUrl(newMessage.content, 3600);
-          newMessage.signedUrl = signedUrlData?.signedUrl || null;
+        const formattedMessage: Message = {
+          id: rawMessage.id,
+          conversationId: rawMessage.conversation_id,
+          text: rawMessage.content,
+          senderId: rawMessage.sender_id,
+          timestamp: new Date(rawMessage.created_at).toISOString(),
+          message_type: rawMessage.message_type,
+          signedUrl: null,
+        };
+
+        if ((formattedMessage.message_type === 'image' || formattedMessage.message_type === 'video' || formattedMessage.message_type === 'audio') && formattedMessage.text) {
+            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+              .from('call-files')
+              .createSignedUrl(formattedMessage.text, 3600);
+
+            if (signedUrlError) {
+              console.error('Failed to get signed URL for incoming message:', signedUrlError);
+            } else {
+                formattedMessage.signedUrl = signedUrlData.signedUrl;
+            }
         }
-        setMessages(currentMessages => [...currentMessages, newMessage]);
+
+        setMessages(currentMessages => [...currentMessages, formattedMessage]);
       })
       .on('postgres_changes', {
         event: 'DELETE',

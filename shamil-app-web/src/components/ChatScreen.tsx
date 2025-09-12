@@ -160,7 +160,16 @@ const ChatScreen: React.FC = () => {
                       : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
                   }`}
                 >
-                  <p>{message.text}</p>
+                  {message.message_type === 'image' && message.signedUrl ? (
+                    <img
+                      src={message.signedUrl}
+                      alt="Image message"
+                      className="rounded-lg max-w-full h-auto"
+                      style={{ maxHeight: '300px' }}
+                    />
+                  ) : (
+                    <p>{message.text}</p>
+                  )}
                   <div
                     className={`text-xs mt-1 ${
                       message.senderId === user?.id ? 'text-indigo-200' : 'text-gray-500'
@@ -181,7 +190,7 @@ const ChatScreen: React.FC = () => {
         <form onSubmit={handleSendMessage} className="flex items-center">
           <button
             type="button"
-            onClick={pickAndSendMedia}
+            onClick={() => pickAndSendMedia('image')} // Correctly call the function with the desired media type
             disabled={isUploading} // Disable button while uploading
             className="p-2 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
           >
