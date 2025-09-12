@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useMessages } from '../hooks/useMessages';
 import { supabase } from '../services/supabase';
 import type { Message } from '../types';
-import { Paperclip, Send } from 'lucide-react'; // Import Paperclip icon
+import { Paperclip, Send } from 'lucide-react'; // Import icons
 
 const ChatScreen: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -167,6 +167,13 @@ const ChatScreen: React.FC = () => {
                       className="rounded-lg max-w-full h-auto"
                       style={{ maxHeight: '300px' }}
                     />
+                  ) : message.message_type === 'video' && message.signedUrl ? (
+                    <video 
+                      src={message.signedUrl} 
+                      controls 
+                      className="rounded-lg max-w-full h-auto"
+                      style={{ maxHeight: '300px' }}
+                    />
                   ) : (
                     <p>{message.text}</p>
                   )}
@@ -190,8 +197,8 @@ const ChatScreen: React.FC = () => {
         <form onSubmit={handleSendMessage} className="flex items-center">
           <button
             type="button"
-            onClick={() => pickAndSendMedia('image')} // Correctly call the function with the desired media type
-            disabled={isUploading} // Disable button while uploading
+            onClick={pickAndSendMedia} // General media picker
+            disabled={isUploading}
             className="p-2 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
           >
             {isUploading ? (

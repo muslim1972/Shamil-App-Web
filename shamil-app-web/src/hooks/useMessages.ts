@@ -211,16 +211,29 @@ export const useMessages = (conversationId: string) => {
     }
   };
 
-  const pickAndSendMedia = async (mediaType: 'image' | 'video' | 'audio') => {
+  const pickAndSendMedia = async () => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = `${mediaType}/*`;
+    input.accept = "image/*,video/*"; // Accept both images and videos
+
     input.onchange = async (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
-      if (file) {
-        await sendFileMessage(file, mediaType);
+      if (!file) return;
+
+      let messageType: 'image' | 'video' | null = null;
+      if (file.type.startsWith('image/')) {
+        messageType = 'image';
+      } else if (file.type.startsWith('video/')) {
+        messageType = 'video';
+      }
+
+      if (messageType) {
+        await sendFileMessage(file, messageType);
+      } else {
+        alert('Unsupported file type. Please select an image or a video.');
       }
     };
+
     input.click();
   };
 
