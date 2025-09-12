@@ -36,7 +36,7 @@ export const useMessages = (conversationId: string) => {
 
       const messagesWithUrls = await Promise.all(
         formattedMessages.map(async (message: Message) => {
-          if ((message.message_type === 'image' || message.message_type === 'video' || message.message_type === 'audio') && message.text) {
+          if ((message.message_type === 'image' || message.message_type === 'video' || message.message_type === 'audio' || message.message_type === 'file') && message.text) {
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
               .from('call-files')
               .createSignedUrl(message.text, 3600);
@@ -103,18 +103,16 @@ export const useMessages = (conversationId: string) => {
     }
   };
 
-  const sendFileMessage = async (file: File, messageType: 'image' | 'video' | 'audio') => {
+  const sendFileMessage = async (file: File, messageType: 'image' | 'video' | 'audio' | 'file') => {
     if (!file) return;
 
     try {
-      // Step 1: Upload the file
       const filePath = await uploadFile(file, messageType);
       if (!filePath) throw new Error('File upload failed to return a path.');
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not logged in');
 
-      // Step 2: Insert the message record into the database
       const { data: insertedData, error: insertError } = await supabase
         .from('messages')
         .insert({
@@ -128,14 +126,12 @@ export const useMessages = (conversationId: string) => {
 
       if (insertError) throw insertError;
 
-      // Step 3: Get the signed URL for the newly uploaded file
       const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('call-files')
         .createSignedUrl(filePath, 3600);
 
       if (signedUrlError) throw signedUrlError;
 
-      // Step 4: Create the final message object with all data
       const newMessage: Message = {
         id: insertedData.id,
         conversationId: insertedData.conversation_id,
@@ -146,7 +142,6 @@ export const useMessages = (conversationId: string) => {
         signedUrl: signedUrlData.signedUrl,
       };
 
-      // Step 5: Update the UI once with the complete message object
       setMessages(currentMessages => [...currentMessages, newMessage]);
 
     } catch (error) {
@@ -211,27 +206,23 @@ export const useMessages = (conversationId: string) => {
     }
   };
 
-  const pickAndSendMedia = async () => {
+  const pickAndSendFile = async (accept: string = '*/*') => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = "image/*,video/*"; // Accept both images and videos
+    input.accept = accept;
 
     input.onchange = async (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      let messageType: 'image' | 'video' | null = null;
+      let messageType: 'image' | 'video' | 'file' = 'file'; // Default to file
       if (file.type.startsWith('image/')) {
         messageType = 'image';
       } else if (file.type.startsWith('video/')) {
         messageType = 'video';
       }
 
-      if (messageType) {
-        await sendFileMessage(file, messageType);
-      } else {
-        alert('Unsupported file type. Please select an image or a video.');
-      }
+      await sendFileMessage(file, messageType);
     };
 
     input.click();
@@ -270,7 +261,7 @@ export const useMessages = (conversationId: string) => {
           signedUrl: null,
         };
 
-        if ((formattedMessage.message_type === 'image' || formattedMessage.message_type === 'video' || formattedMessage.message_type === 'audio') && formattedMessage.text) {
+        if ((formattedMessage.message_type === 'image' || formattedMessage.message_type === 'video' || formattedMessage.message_type === 'audio' || formattedMessage.message_type === 'file') && formattedMessage.text) {
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
               .from('call-files')
               .createSignedUrl(formattedMessage.text, 3600);
@@ -309,6 +300,6 @@ export const useMessages = (conversationId: string) => {
     messagesEndRef,
     isUploading,
     uploadProgress,
-    pickAndSendMedia,
+    pickAndSendFile, // Export new function
   };
 };

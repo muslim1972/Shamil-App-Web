@@ -4,15 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import { useMessages } from '../hooks/useMessages';
 import { supabase } from '../services/supabase';
 import type { Message } from '../types';
-import { Paperclip, Send } from 'lucide-react'; // Import icons
+import { Paperclip, Send, Image, File as FileIcon, MapPin, Mic, Download } from 'lucide-react'; // Import icons
 
 const ChatScreen: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, markMessagesAsRead, messagesEndRef, isUploading, pickAndSendMedia } = useMessages(conversationId || '');
+  const { messages, loading, error, sendMessage, markMessagesAsRead, messagesEndRef, isUploading, pickAndSendFile } = useMessages(conversationId || '');
   const [newMessage, setNewMessage] = useState('');
   const [conversationDetails, setConversationDetails] = useState<{ id: string; name: string; } | null>(null);
+  const [isAttachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+
+  // Helper to extract filename from path
+  const getFilenameFromPath = (path: string) => {
+    try {
+      return path.split('/').pop()?.split('_').slice(1).join('_') || 'file';
+    } catch {
+      return 'file';
+    }
+  };
 
   const fetchConversationDetails = useCallback(async () => {
     if (!conversationId || !user?.id) return;
@@ -156,8 +166,8 @@ const ChatScreen: React.FC = () => {
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                     message.senderId === user?.id
-                      ? 'bg-indigo-500 text-white rounded-br-none'
-                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-white text-gray-800 shadow-sm'
                   }`}
                 >
                   {message.message_type === 'image' && message.signedUrl ? (
@@ -174,11 +184,23 @@ const ChatScreen: React.FC = () => {
                       className="rounded-lg max-w-full h-auto"
                       style={{ maxHeight: '300px' }}
                     />
+                  ) : message.message_type === 'file' && message.signedUrl ? (
+                    <a 
+                      href={message.signedUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center p-2 bg-gray-200 rounded-lg hover:bg-gray-300"
+                    >
+                      <FileIcon className="w-6 h-6 mr-2 text-gray-600" />
+                      <span className="truncate text-sm font-medium text-gray-800">{getFilenameFromPath(message.text)}</span>
+                      <Download className="w-5 h-5 ml-auto text-gray-500" />
+                    </a>
                   ) : (
                     <p>{message.text}</p>
                   )}
                   <div
-                    className={`text-xs mt-1 ${
+                    className={`text-xs mt-1 text-right w-full ${ 
                       message.senderId === user?.id ? 'text-indigo-200' : 'text-gray-500'
                     }`}
                   >
@@ -193,11 +215,42 @@ const ChatScreen: React.FC = () => {
       </div>
 
       {/* Message Input */}
-      <div className="bg-white border-t border-gray-200 p-4">
+      <div className="bg-white border-t border-gray-200 p-4 relative">
+        {isAttachmentMenuOpen && (
+            <div className="absolute bottom-16 left-2 bg-white rounded-lg shadow-xl z-20 w-56 border border-gray-100">
+              <ul>
+                <li 
+                  className="p-3 hover:bg-gray-100 cursor-pointer flex items-center text-gray-700"
+                  onClick={() => {
+                      pickAndSendFile("image/*,video/*");
+                      setAttachmentMenuOpen(false);
+                  }}
+                >
+                  <Image size={20} className="mr-3 text-purple-500" />
+                  <span>صور وفيديوهات</span>
+                </li>
+                <li className="p-3 hover:bg-gray-100 cursor-pointer flex items-center text-gray-700" onClick={() => {alert('Not implemented'); setAttachmentMenuOpen(false);}}>
+                  <Mic size={20} className="mr-3 text-red-500" />
+                  <span>مقطع صوتي</span>
+                </li>
+                <li className="p-3 hover:bg-gray-100 cursor-pointer flex items-center text-gray-700" onClick={() => {alert('Not implemented'); setAttachmentMenuOpen(false);}}>
+                  <MapPin size={20} className="mr-3 text-green-500" />
+                  <span>موقع</span>
+                </li>
+                <li className="p-3 hover:bg-gray-100 cursor-pointer flex items-center text-gray-700" onClick={() => {
+                    pickAndSendFile('*/*');
+                    setAttachmentMenuOpen(false);
+                }}>
+                  <FileIcon size={20} className="mr-3 text-blue-500" />
+                  <span>ملف</span>
+                </li>
+              </ul>
+            </div>
+        )}
         <form onSubmit={handleSendMessage} className="flex items-center">
           <button
             type="button"
-            onClick={pickAndSendMedia} // General media picker
+            onClick={() => setAttachmentMenuOpen(prev => !prev)}
             disabled={isUploading}
             className="p-2 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full"
           >
