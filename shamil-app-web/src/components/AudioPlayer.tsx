@@ -125,19 +125,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({ message, isOwnMessage 
         preload="metadata"
         // إضافة خصائص لضمان تشغيل جميع أنواع الملفات الصوتية
         controls={false}
-        // تحديد نوع الصوت بناءً على امتداد الملف
-        type={(() => {
-          const url = (message as any).signedUrl || '';
-          const ext = url.split('.').pop()?.toLowerCase() || '';
-          
-          if (ext === 'mp3') return 'audio/mpeg';
-          if (ext === 'wav') return 'audio/wav';
-          if (ext === 'ogg') return 'audio/ogg';
-          if (ext === 'm4a' || ext === 'aac') return 'audio/mp4';
-          if (ext === 'flac') return 'audio/flac';
-          // للملفات الصوتية الأخرى مثل .dat
-          return 'audio/webm';
-        })()}
       />
     </div>
   );

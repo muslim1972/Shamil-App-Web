@@ -9,4 +9,30 @@ export default defineConfig({
       'react-native': 'react-native-web',
     },
   },
+  server: {
+    port: 5173,
+    host: true, // السماح بالاتصال من الأجهزة الخارجية
+    strictPort: true,
+    watch: {
+      usePolling: true
+    }
+  },
+  build: {
+    target: 'es2015',
+    outDir: 'dist',
+    assetsDir: 'assets',
+    minify: 'terser',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom'],
+  },
 });

@@ -622,12 +622,12 @@ const ChatScreen: React.FC = () => {
             />
         )}
 
-        <div className="flex items-center">
+        <div className="flex items-center px-2">
           <button
             type="button"
             onClick={() => setAttachmentMenuOpen(prev => !prev)}
             disabled={isUploading || isRecording}
-            className="p-2 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full disabled:opacity-50"
+            className="p-2 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-full disabled:opacity-50 flex-shrink-0"
           >
             <Paperclip size={24} className="rotate-45" />
           </button>
@@ -636,14 +636,14 @@ const ChatScreen: React.FC = () => {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="اكتب رسالة..."
-            className="flex-1 border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mx-2"
+            className="flex-1 border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mx-2 min-w-0"
             disabled={isRecording}
           />
           {newMessage.length > 0 ? (
             <button
                 type="button" // Should be submit if it's in a form, but we handle with onClick
                 onClick={handleSendMessage}
-                className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex-shrink-0"
             >
                 <Send size={20} />
             </button>
@@ -652,7 +652,7 @@ const ChatScreen: React.FC = () => {
                 type="button"
                 onClick={handleStartRecording}
                 disabled={isUploading || isRecording}
-                className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 relative group"
+                className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 relative group flex-shrink-0"
                 title="اضغط لتسجيل رسالة صوتية"
             >
                 <Mic size={20} />

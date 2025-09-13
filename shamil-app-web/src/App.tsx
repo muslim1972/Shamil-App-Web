@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthScreen from './components/AuthScreen';
 import ConversationListScreen from './components/ConversationListScreen';
 import ChatScreen from './components/ChatScreen';
 import UserListScreen from './components/UserListScreen';
+
 
 // Main component for routing
 const AppRoutes: React.FC = () => {
@@ -31,10 +32,6 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  useEffect(() => {
-    // Placeholder for any side effects
-  }, []);
-
   return (
     <Router>
       <AuthProvider>
