@@ -119,10 +119,7 @@ const ConversationListScreen: React.FC = () => {
   return (
     <div className="h-screen bg-slate-100 dark:bg-slate-900 flex justify-center">
       <main className="w-full max-w-2xl h-screen flex flex-col bg-white dark:bg-slate-800 shadow-2xl">
-        {/* Test Button */}
-        <div className="p-4 bg-blue-500 text-white text-center font-bold rounded-lg shadow-lg m-4">
-          هذا زر اختبار التصميم
-        </div>
+        
 
         {/* Header */}
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-lg p-4 shadow-sm border-b border-slate-200 dark:border-slate-700 z-10">

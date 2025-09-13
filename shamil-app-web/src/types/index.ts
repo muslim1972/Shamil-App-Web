@@ -21,6 +21,10 @@ export interface Message {
   text: string;
   senderId: string;
   timestamp: string;
+  message_type?: 'text' | 'image' | 'video' | 'audio' | 'file';
+  signedUrl?: string | null;
+  caption?: string | null;
+  media_metadata?: { duration?: number; [key: string]: any } | null;
 }
 
 export interface AuthState {

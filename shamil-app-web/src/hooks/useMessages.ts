@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import type { Message } from '../types';
 
+// Add type assertion for messages from Supabase
+
 export const useMessages = (conversationId: string) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export const useMessages = (conversationId: string) => {
 
       const messagesWithUrls = await Promise.all(
         formattedMessages.map(async (message: Message) => {
-          if ((message.message_type === 'image' || message.message_type === 'video' || message.message_type === 'audio' || message.message_type === 'file') && message.text) {
+          if (((message as any).message_type === 'image' || (message as any).message_type === 'video' || (message as any).message_type === 'audio' || (message as any).message_type === 'file') && message.text) {
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
               .from('call-files')
               .createSignedUrl(message.text, 3600);
@@ -67,7 +69,7 @@ export const useMessages = (conversationId: string) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const uploadFile = async (file: File, type: string): Promise<string | null> => {
+  const uploadFile = async (file: File, _type: string): Promise<string | null> => {
     if (!file || !conversationId) return null;
 
     setIsUploading(true);
@@ -80,11 +82,31 @@ export const useMessages = (conversationId: string) => {
       const fileExt = file.name.split('.').pop();
       const uniqueFileName = `${user.id}/${Date.now()}_${conversationId}.${fileExt}`;
       const filePath = `public/${uniqueFileName}`;
+      
+      // تحديد نوع المحتوى المناسب للملف
+      let contentType = file.type;
+      if (_type === 'audio') {
+        // تحديد نوع المحتوى بناءً على امتداد الملف
+        if (fileExt === 'mp3') {
+          contentType = 'audio/mpeg';
+        } else if (fileExt === 'wav') {
+          contentType = 'audio/wav';
+        } else if (fileExt === 'ogg') {
+          contentType = 'audio/ogg';
+        } else if (fileExt === 'm4a' || fileExt === 'aac') {
+          contentType = 'audio/mp4';
+        } else if (fileExt === 'flac') {
+          contentType = 'audio/flac';
+        } else {
+          // للملفات الصوتية الأخرى مثل .dat
+          contentType = 'audio/webm';
+        }
+      }
 
       const { error: uploadError } = await supabase.storage
         .from('call-files')
         .upload(filePath, file, {
-          contentType: file.type,
+          contentType: contentType,
           upsert: false,
         });
 
@@ -138,7 +160,7 @@ export const useMessages = (conversationId: string) => {
         text: insertedData.content,
         senderId: insertedData.sender_id,
         timestamp: new Date(insertedData.created_at).toISOString(),
-        message_type: insertedData.message_type,
+        message_type: insertedData.message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
         signedUrl: signedUrlData.signedUrl,
       };
 
@@ -182,7 +204,7 @@ export const useMessages = (conversationId: string) => {
           text: data[0].content,
           senderId: data[0].sender_id,
           timestamp: new Date(data[0].created_at).toISOString(),
-          message_type: data[0].message_type,
+          message_type: (data[0] as any).message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
           signedUrl: null
         };
         setMessages(currentMessages => [...currentMessages, newMessage]);
@@ -206,7 +228,7 @@ export const useMessages = (conversationId: string) => {
     }
   };
 
-  const pickAndSendFile = async (accept: string = '*/*') => {
+  const pickAndSendMedia = async (accept: string = '*/*') => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
@@ -215,17 +237,118 @@ export const useMessages = (conversationId: string) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      let messageType: 'image' | 'video' | 'file' = 'file'; // Default to file
+      let messageType: 'image' | 'video' | 'audio' | 'file' = 'file'; // Default to file
+      const fileName = file.name.toLowerCase();
+      const fileExt = fileName.split('.').pop() || '';
+      
+      // قائمة الامتدادات الصوتية المدعومة
+      const audioExtensions = ['dat', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'];
+      
       if (file.type.startsWith('image/')) {
         messageType = 'image';
       } else if (file.type.startsWith('video/')) {
         messageType = 'video';
+      } else if (file.type.startsWith('audio/') || audioExtensions.includes(fileExt)) {
+        messageType = 'audio';
+        // فرض نوع MIME صحيح للملفات الصوتية
+        if (!file.type || file.type === '' || file.type === 'application/octet-stream') {
+          Object.defineProperty(file, 'type', {
+            writable: true,
+            value: 'audio/webm'
+          });
+        }
       }
 
       await sendFileMessage(file, messageType);
     };
 
     input.click();
+  };
+
+  const sendAudioMessage = async (audioBlob: Blob, duration: number, caption: string = '') => {
+    if (!audioBlob || !conversationId) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // التحقق من المستخدم
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('المستخدم غير مسجل الدخول');
+
+      // إنشاء اسم فريد للملف
+      const fileExt = 'webm';
+      const uniqueFileName = `${user.id}/${Date.now()}_${conversationId}.${fileExt}`;
+      const filePath = `public/${uniqueFileName}`;
+
+      // رفع الملف إلى التخزين
+      const { error: uploadError } = await supabase.storage
+        .from('call-files')
+        .upload(filePath, audioBlob, {
+          contentType: 'audio/webm',
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // إنشاء رابط موقّع
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from('call-files')
+        .createSignedUrl(filePath, 3600);
+
+      if (signedUrlError) throw signedUrlError;
+
+      // إدخال الرسالة في قاعدة البيانات
+      const { data: insertedData, error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          content: filePath,
+          sender_id: user.id,
+          message_type: 'audio',
+          caption: caption || null,
+          media_metadata: { duration: duration },
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // إضافة الرسالة إلى القائمة المحلية
+      const newMessage: Message = {
+        id: insertedData.id,
+        conversationId: insertedData.conversation_id,
+        text: insertedData.content,
+        senderId: insertedData.sender_id,
+        timestamp: new Date(insertedData.created_at).toISOString(),
+        message_type: 'audio',
+        signedUrl: signedUrlData.signedUrl,
+        caption: insertedData.caption,
+        media_metadata: insertedData.media_metadata,
+      };
+
+      setMessages(currentMessages => [...currentMessages, newMessage]);
+
+      // تحديث إعدادات المحادثة
+      await supabase
+        .from('user_conversation_settings')
+        .upsert(
+          {
+            user_id: user.id,
+            conversation_id: conversationId,
+            is_hidden: false,
+            hidden_at: null,
+          },
+          { onConflict: 'user_id,conversation_id' }
+        );
+
+    } catch (error) {
+      console.error('Error sending audio message:', error);
+      throw error;
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(100);
+    }
   };
 
   const markMessagesAsRead = useCallback(async (): Promise<void> => {
@@ -257,11 +380,11 @@ export const useMessages = (conversationId: string) => {
           text: rawMessage.content,
           senderId: rawMessage.sender_id,
           timestamp: new Date(rawMessage.created_at).toISOString(),
-          message_type: rawMessage.message_type,
+          message_type: (rawMessage as any).message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
           signedUrl: null,
         };
 
-        if ((formattedMessage.message_type === 'image' || formattedMessage.message_type === 'video' || formattedMessage.message_type === 'audio' || formattedMessage.message_type === 'file') && formattedMessage.text) {
+        if (((formattedMessage as any).message_type === 'image' || (formattedMessage as any).message_type === 'video' || (formattedMessage as any).message_type === 'audio' || (formattedMessage as any).message_type === 'file') && formattedMessage.text) {
             const { data: signedUrlData, error: signedUrlError } = await supabase.storage
               .from('call-files')
               .createSignedUrl(formattedMessage.text, 3600);
@@ -300,6 +423,7 @@ export const useMessages = (conversationId: string) => {
     messagesEndRef,
     isUploading,
     uploadProgress,
-    pickAndSendFile, // Export new function
+    pickAndSendMedia,
+    sendAudioMessage,
   };
 };
