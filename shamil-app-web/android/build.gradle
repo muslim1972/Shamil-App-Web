@@ -27,3 +27,17 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+// تعريف مهمة testClasses لجميع المشاريع الفرعية
+subprojects {
+    afterEvaluate { project ->
+        if (!project.tasks.findByName('testClasses')) {
+            task testClasses {
+                dependsOn 'compileDebugSources'
+                doLast {
+                    println "testClasses task completed for ${project.name}"
+                }
+            }
+        }
+    }
+}

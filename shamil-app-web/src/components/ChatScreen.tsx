@@ -55,6 +55,7 @@ const ChatScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState('');
   const [conversationDetails, setConversationDetails] = useState<{ id: string; name: string; } | null>(null);
   const [isAttachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // New state for recording
   const [isRecording, setIsRecording] = useState(false);
@@ -73,6 +74,18 @@ const ChatScreen: React.FC = () => {
       return 'file';
     }
   };
+
+  // دالة للتمرير إلى آخر رسالة
+  const scrollToBottom = useCallback(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      // التأكد من وصول التمرير إلى القاع تمامًا
+      const container = document.getElementById('messages-container');
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  }, []);
 
   const fetchConversationDetails = useCallback(async () => {
     if (!conversationId || !user?.id) return;
@@ -128,13 +141,51 @@ const ChatScreen: React.FC = () => {
     }
   }, [conversationId, markMessagesAsRead]);
 
+  // التمرير إلى آخر رسالة عند تحديث الرسائل أو اكتمال التحميل
+  useEffect(() => {
+    // فقط قم بالتمرير عندما لا تكون هناك رسائل قيد التحميل
+    if (!loading && messages.length > 0) {
+      // استخدام requestAnimationFrame لضمان التمرير بعد اكتمال العرض
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
+    }
+  }, [messages, loading, scrollToBottom]);
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() === '' || !conversationId) return;
 
     try {
-      await sendMessage(newMessage);
+      // حفظ حالة التركيز قبل الإرسال
+      const wasInputFocused = document.activeElement === inputRef.current;
+      
+      // إرسال الرسالة وتفريغ الحقل
+      const messagePromise = sendMessage(newMessage);
       setNewMessage('');
+      
+      // الحفاظ على التركيز أثناء الإرسال
+      if (wasInputFocused && inputRef.current) {
+        inputRef.current.focus();
+      }
+      
+      // انتظار اكتمال الإرسال
+      await messagePromise;
+      
+      // التمرير إلى آخر رسالة بعد الإرسال
+      scrollToBottom();
+      
+      // إعادة التركيز بعد اكتمال جميع العمليات
+      if (inputRef.current) {
+        // استخدام requestAnimationFrame لضمان التركيز بعد تحديث DOM
+        requestAnimationFrame(() => {
+          if (inputRef.current) {
+            inputRef.current.focus();
+            // منع إخفاء لوحة المفاتيح عن طريق التمرير الناعم
+            window.scrollTo(0, window.pageYOffset);
+          }
+        });
+      }
     } catch (error) {
       console.error('فشل في إرسال الرسالة:', error);
     }
@@ -462,7 +513,7 @@ const ChatScreen: React.FC = () => {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-100" id="messages-container">
         {messages.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             لا توجد رسائل. ابدأ المحادثة الآن!
@@ -572,7 +623,17 @@ const ChatScreen: React.FC = () => {
       </div>
 
       {/* Message Input */}
-      <div className="bg-white border-t border-gray-200 p-4 relative">
+      <form 
+        className="bg-white border-t border-gray-200 p-4 relative" 
+        onSubmit={handleSendMessage}
+        onKeyDown={(e) => {
+          // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage(e as any);
+          }
+        }}
+      >
         {isAttachmentMenuOpen && (
             <div className="absolute bottom-16 left-2 bg-white rounded-lg shadow-xl z-20 w-56 border border-gray-100">
               <ul>
@@ -633,16 +694,26 @@ const ChatScreen: React.FC = () => {
           </button>
           <input
             type="text"
+            ref={inputRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="اكتب رسالة..."
             className="flex-1 border border-gray-300 rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent mx-2 min-w-0"
             disabled={isRecording}
+            onFocus={(e) => {
+              // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز
+              e.preventDefault();
+              // التركيز على حقل الإدخال
+              if (inputRef.current) {
+                inputRef.current.focus();
+              }
+              // منع إخفاء لوحة المفاتيح
+              e.stopPropagation();
+            }}
           />
           {newMessage.length > 0 ? (
             <button
-                type="button" // Should be submit if it's in a form, but we handle with onClick
-                onClick={handleSendMessage}
+                type="submit"
                 className="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex-shrink-0"
             >
                 <Send size={20} />
@@ -664,7 +735,7 @@ const ChatScreen: React.FC = () => {
           )}
 
         </div>
-      </div>
+      </form>
     </div>
   );
 };
