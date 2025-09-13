@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConversations } from '../hooks/useConversations';
@@ -8,7 +8,7 @@ import { ar } from 'date-fns/locale';
 import { LogOut, MessageSquarePlus, Search, User } from 'lucide-react';
 
 // Component for each conversation item in the list
-const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = ({ conversation, onSelect }) => {
+const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = React.memo(({ conversation, onSelect }) => {
   const formattedTimestamp = useMemo(() => {
     if (!conversation.timestamp) return '';
     try {
@@ -52,7 +52,9 @@ const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: st
       </div>
     </li>
   );
-};
+});
+
+ConversationItem.displayName = 'ConversationItem';
 
 const ConversationListScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -66,24 +68,28 @@ const ConversationListScreen: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const handleSelectConversation = (conversationId: string) => {
+  const handleSelectConversation = useCallback((conversationId: string) => {
     navigate(`/chat/${conversationId}`);
-  };
+  }, [navigate]);
 
-  const handleCreateNewConversation = () => {
+  const handleCreateNewConversation = useCallback(() => {
     navigate('/users');
-  };
+  }, [navigate]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await signOut();
       navigate('/auth');
     } catch (error) {
       console.error('فشل تسجيل الخروج:', error);
     }
-  };
+  }, [signOut, navigate]);
 
-  const filteredConversations = useMemo(() => 
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
+
+  const filteredConversations = useMemo(() =>
     conversations.filter(conversation =>
       (conversation.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     ), [conversations, searchTerm]);
@@ -119,7 +125,6 @@ const ConversationListScreen: React.FC = () => {
   return (
     <div className="h-screen bg-slate-100 dark:bg-slate-900 flex justify-center">
       <main className="w-full max-w-2xl h-screen flex flex-col bg-white dark:bg-slate-800 shadow-2xl">
-        
 
         {/* Header */}
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-lg p-4 shadow-sm border-b border-slate-200 dark:border-slate-700 z-10">
@@ -154,7 +159,7 @@ const ConversationListScreen: React.FC = () => {
                 placeholder="بحث عن محادثة..."
                 className="w-full p-2 pl-10 rtl:pr-10 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-transparent focus:border-transparent"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={handleSearchChange}
               />
             </div>
           </div>
@@ -181,4 +186,4 @@ const ConversationListScreen: React.FC = () => {
   );
 };
 
-export default ConversationListScreen;
+export default React.memo(ConversationListScreen);
