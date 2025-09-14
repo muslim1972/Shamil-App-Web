@@ -275,13 +275,67 @@
         // اختبار الميكروفون
         testMicBtn.addEventListener('click', async () => {
             try {
-                log('جاري اختبار الميكروفون...');
+                log('=== تشخيص مشكلة الميكروفون ===');
+                log('نوع المتصفح: ' + navigator.userAgent);
+                log('نظام التشغيل: ' + navigator.platform);
+                
+                // التحقق من دعم واجهة برمجة التطبيقات
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    log('خطأ: المتصفح لا يدعم الوصول إلى الميكروفون');
+                    return;
+                }
+                
+                log('المتصفح يدعم الوصول إلى الميكروفون');
+                
+                // التحقق من الصلاحيات
+                try {
+                    const permissions = await navigator.permissions.query({ name: 'microphone' });
+                    log(`حالة صلاحية الميكروفون: ${permissions.state}`);
+                    
+                    if (permissions.state === 'denied') {
+                        log('تم رفض صلاحية الميكروفون. يرجى التحقق من إعدادات المتصفح أو التطبيق.');
+                        return;
+                    }
+                } catch (permErr) {
+                    log(`لا يمكن التحقق من الصلاحية: ${permErr.message}`);
+                }
                 
                 // طلب صلاحية الميكروفون
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                log('جاري طلب صلاحية الميكروفون...');
+                
+                // تجربة إعدادات مختلفة
+                const constraintsList = [
+                    { audio: true },
+                    { audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } },
+                    { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } },
+                    { audio: { sampleRate: 44100, channelCount: 1 } },
+                    { audio: { sampleRate: 48000, channelCount: 2 } }
+                ];
+                
+                let stream = null;
+                let workingConstraints = null;
+                
+                for (const constraints of constraintsList) {
+                    try {
+                        log(`جاري تجربة الإعدادات: ${JSON.stringify(constraints)}`);
+                        stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        workingConstraints = constraints;
+                        log(`نجحت الإعدادات: ${JSON.stringify(constraints)}`);
+                        break;
+                    } catch (constraintErr) {
+                        log(`فشلت الإعدادات: ${JSON.stringify(constraints)} - الخطأ: ${constraintErr.name}: ${constraintErr.message}`);
+                    }
+                }
+                
+                if (!stream) {
+                    log('فشلت جميع محاولات الوصول إلى الميكروفون');
+                    return;
+                }
+                
+                log('تم الحصول على صلاحية الميكروفون بنجاح');
                 
                 // إنشاء عنصر صوت للاختبار
-                const audioContext = new AudioContext();
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const source = audioContext.createMediaStreamSource(stream);
                 const analyser = audioContext.createAnalyser();
                 
@@ -334,7 +388,7 @@
                 };
                 
             } catch (err) {
-                log(`خطأ في اختبار الميكروفون: ${err.message}`);
+                log(`خطأ في اختبار الميكروفون: ${err.name}: ${err.message}`);
                 console.error('خطأ في اختبار الميكروفون:', err);
             }
         });

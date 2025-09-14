@@ -7,7 +7,6 @@ import { useLocation } from '../hooks/useLocation';
 import { ChatHeader } from './chat/ChatHeader';
 import { MessageList } from './chat/MessageList';
 import { MessageForm } from './chat/MessageForm';
-import { MicrophonePermissionDialog } from './MicrophonePermissionDialog';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -41,9 +40,6 @@ const ChatScreen: React.FC = () => {
     handleStartRecording,
     handleCancelRecording,
     handleSendRecording,
-    showPermissionDialog,
-    setShowPermissionDialog,
-    openBrowserSettings
   } = useRecording({ sendAudioMessage });
 
   const { handleSendLocation } = useLocation({ sendMessage });
@@ -195,13 +191,6 @@ const ChatScreen: React.FC = () => {
           disabled={!isOnline || isSending}
         />
       </div>
-
-      {/* Microphone Permission Dialog */}
-      <MicrophonePermissionDialog
-        isOpen={showPermissionDialog}
-        onClose={() => setShowPermissionDialog(false)}
-        onOpenSettings={openBrowserSettings}
-      />
     </div>
   );
 };
