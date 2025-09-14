@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اختبار تسجيل الصوت</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            direction: rtl;
+        }
+        .container {
+            background-color: #f5f5f5;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        #startBtn {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #startBtn:hover {
+            background-color: #45a049;
+        }
+        #stopBtn {
+            background-color: #f44336;
+            color: white;
+        }
+        #stopBtn:hover {
+            background-color: #d32f2f;
+        }
+        #playBtn {
+            background-color: #2196F3;
+            color: white;
+        }
+        #playBtn:hover {
+            background-color: #0b7dda;
+        }
+        #downloadBtn {
+            background-color: #FF9800;
+            color: white;
+        }
+        #downloadBtn:hover {
+            background-color: #e68900;
+        }
+        .status {
+            text-align: center;
+            margin: 20px 0;
+            font-size: 18px;
+        }
+        .recording {
+            color: #f44336;
+            font-weight: bold;
+        }
+        audio {
+            width: 100%;
+            margin-top: 20px;
+        }
+        .log {
+            background-color: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>اختبار تسجيل الصوت</h1>
+
+        <div class="controls">
+            <button id="testMicBtn">اختبار الميكروفون</button>
+            <button id="startBtn">بدء التسجيل</button>
+            <button id="stopBtn" disabled>إيقاف التسجيل</button>
+            <button id="playBtn" disabled>تشغيل التسجيل</button>
+            <button id="downloadBtn" disabled>تحميل التسجيل</button>
+        </div>
+
+        <div id="status" class="status">جاهز للتسجيل</div>
+
+        <audio id="audioPlayer" controls style="display: none;"></audio>
+
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        // عناصر الواجهة
+        const testMicBtn = document.getElementById('testMicBtn');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusDiv = document.getElementById('status');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const logDiv = document.getElementById('log');
+
+        // متغيرات التسجيل
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+
+        // دالة لإضافة رسائل إلى سجل الأحداث
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // بدء التسجيل
+        startBtn.addEventListener('click', async () => {
+            try {
+                log('جاري طلب صلاحية الميكروفون...');
+
+                // طلب صلاحية الميكروفون
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: true, 
+                    video: false 
+                });
+
+                log('تم منح صلاحية الميكروفون بنجاح');
+
+                // تهيئة مسجل الصوت - تجربة عدة تنسيقات
+                let options;
+                let formatUsed = '';
+                
+                // تجربة تنسيقات مختلفة بالترتيب
+                const formats = [
+                    { mimeType: 'audio/webm;codecs=opus' },
+                    { mimeType: 'audio/webm' },
+                    { mimeType: 'audio/ogg;codecs=opus' },
+                    { mimeType: 'audio/ogg' },
+                    { mimeType: 'audio/wav' }
+                ];
+                
+                for (const format of formats) {
+                    if (MediaRecorder.isTypeSupported(format.mimeType)) {
+                        options = format;
+                        formatUsed = format.mimeType;
+                        log(`استخدام تنسيق: ${format.mimeType}`);
+                        break;
+                    }
+                }
+                
+                if (!options) {
+                    log('جميع التنسيقات غير مدعومة، جاري استخدام التنسيق الافتراضي');
+                    mediaRecorder = new MediaRecorder(stream);
+                } else {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                }
+
+                audioChunks = [];
+
+                // معالجة البيانات الصوتية
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                        log(`تم استلام جزء صوتي بحجم: ${event.data.size} بايت`);
+                    }
+                };
+
+                // عند إيقاف التسجيل
+                mediaRecorder.onstop = () => {
+                    // إنشاء ملف صوتي من الأجزاء المسجلة
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+
+                    log(`تم إيقاف التسجيل. حجم الملف: ${audioBlob.size} بايت`);
+
+                    // تحديث الواجهة
+                    statusDiv.textContent = 'تم إيقاف التسجيل';
+                    statusDiv.classList.remove('recording');
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    playBtn.disabled = false;
+                    downloadBtn.disabled = false;
+
+                    // إعداد مشغل الصوت
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'block';
+
+                    // إيقاف جميع مسارات الصوت
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                // بدء التسجيل
+                mediaRecorder.start();
+                log('بدء التسجيل...');
+
+                // تحديث الواجهة
+                statusDiv.textContent = 'جاري التسجيل...';
+                statusDiv.classList.add('recording');
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                playBtn.disabled = true;
+                downloadBtn.disabled = true;
+
+            } catch (err) {
+                log(`خطأ: ${err.message}`);
+                console.error('خطأ في الوصول إلى الميكروفون:', err);
+            }
+        });
+
+        // إيقاف التسجيل
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                log('تم إيقاف التسجيل يدويًا');
+            }
+        });
+
+        // تشغيل التسجيل
+        playBtn.addEventListener('click', () => {
+            if (audioPlayer) {
+                audioPlayer.play();
+                log('جاري تشغيل التسجيل');
+            }
+        });
+
+        // تحميل التسجيل
+        downloadBtn.addEventListener('click', () => {
+            if (audioBlob) {
+                const a = document.createElement('a');
+                a.href = audioUrl;
+                a.download = `test-recording-${Date.now()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                log(`تم تحميل الملف باسم: ${a.download}`);
+            }
+        });
+
+        // مراقبة أحداث مشغل الصوت
+        audioPlayer.addEventListener('play', () => {
+            log('بدأ تشغيل الصوت');
+        });
+
+        audioPlayer.addEventListener('pause', () => {
+            log('تم إيقاف تشغيل الصوت');
+        });
+
+        audioPlayer.addEventListener('ended', () => {
+            log('انتهى تشغيل الصوت');
+        });
+
+        audioPlayer.addEventListener('error', (e) => {
+            log(`خطأ في تشغيل الصوت: ${e.message}`);
+        });
+
+        // اختبار الميكروفون
+        testMicBtn.addEventListener('click', async () => {
+            try {
+                log('جاري اختبار الميكروفون...');
+                
+                // طلب صلاحية الميكروفون
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // إنشاء عنصر صوت للاختبار
+                const audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                
+                source.connect(analyser);
+                
+                // إعداد تحليل الصوت
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                
+                log('تم توصيل الميكروفون. تحدث الآن...');
+                
+                // مراقبة مستوى الصوت
+                const checkSound = () => {
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    // حساب متوسط مستوى الصوت
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        sum += dataArray[i];
+                    }
+                    const average = sum / bufferLength;
+                    
+                    // إذا كان هناك صوت (أعلى من عتبة معينة)
+                    if (average > 10) {
+                        log(`تم اكتشاف صوت! المستوى: ${average.toFixed(2)}`);
+                    }
+                    
+                    // الاستمرار في المراقبة
+                    if (testMicBtn.textContent === 'إيقاف الاختبار') {
+                        requestAnimationFrame(checkSound);
+                    }
+                };
+                
+                // بدء المراقبة
+                checkSound();
+                
+                // تغيير نص الزر
+                testMicBtn.textContent = 'إيقاف الاختبار';
+                
+                // عند النقر مرة أخرى لإيقاف الاختبار
+                testMicBtn.onclick = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                    audioContext.close();
+                    testMicBtn.textContent = 'اختبار الميكروفون';
+                    log('تم إيقاف اختبار الميكروفون');
+                    
+                    // إعادة تعيين معالج النقر
+                    testMicBtn.onclick = testMicBtn.click;
+                };
+                
+            } catch (err) {
+                log(`خطأ في اختبار الميكروفون: ${err.message}`);
+                console.error('خطأ في اختبار الميكروفون:', err);
+            }
+        });
+        
+        // رسالة الترحيب
+        log('تم تحميل صفحة اختبار تسجيل الصوت');
+    </script>
+</body>
+</html>

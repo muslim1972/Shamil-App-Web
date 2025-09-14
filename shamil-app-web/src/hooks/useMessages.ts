@@ -1,230 +1,310 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '../services/supabase';
-import type { Message } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase, supabaseUrl } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import * as tus from 'tus-js-client';
 
-// Add type assertion for messages from Supabase
+interface Message {
+  id: string;
+  conversationId: string;
+  text: string;
+  senderId: string;
+  timestamp: string;
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
+  signedUrl: string | null;
+  caption?: string | null;
+  media_metadata?: { duration: number } | null;
+}
 
-export const useMessages = (conversationId: string) => {
+interface UseChatMessagesProps {
+  conversationId?: string;
+}
+
+export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [conversationDetails, setConversationDetails] = useState<any>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesChannelRef = useRef<RealtimeChannel | null>(null);
 
+  // Fetch messages for the conversation
   const fetchMessages = useCallback(async () => {
     if (!conversationId) return;
+
     setLoading(true);
-    setError(null);
-
     try {
-      const { data, error: rpcError } = await supabase.rpc('get_visible_messages', {
-        p_conversation_id: conversationId,
-      });
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
 
-      if (rpcError) {
-        throw rpcError;
-      }
+      if (error) throw error;
 
-      const formattedMessages: Message[] = data.map((msg: any) => ({
-        id: msg.id,
-        conversationId: msg.conversation_id,
-        text: msg.content,
-        senderId: msg.sender_id,
-        timestamp: new Date(msg.created_at).toISOString(),
-        message_type: msg.message_type,
-        signedUrl: null,
-      }));
-
-      const messagesWithUrls = await Promise.all(
-        formattedMessages.map(async (message: Message) => {
-          if (((message as any).message_type === 'image' || (message as any).message_type === 'video' || (message as any).message_type === 'audio' || (message as any).message_type === 'file') && message.text) {
-            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      // Format messages and add signed URLs for media files
+      const formattedMessages: Message[] = await Promise.all(
+        data.map(async (msg: any) => {
+          let signedUrl = null;
+          if (msg.message_type !== 'text') {
+            const { data: signedUrlData } = await supabase.storage
               .from('call-files')
-              .createSignedUrl(message.text, 3600);
-
-            if (signedUrlError) {
-              console.error('Error creating signed URL:', signedUrlError);
-              return message;
-            }
-            return { ...message, signedUrl: signedUrlData?.signedUrl || null };
+              .createSignedUrl(msg.content, 3600);
+            signedUrl = signedUrlData?.signedUrl || null;
           }
-          return message;
+
+          return {
+            id: msg.id,
+            conversationId: msg.conversation_id,
+            text: msg.content,
+            senderId: msg.sender_id,
+            timestamp: new Date(msg.created_at).toISOString(),
+            message_type: msg.message_type,
+            caption: msg.caption,
+            media_metadata: msg.media_metadata,
+            signedUrl,
+          };
         })
       );
-      setMessages(messagesWithUrls);
-    } catch (err: any) {
-      console.error('Error fetching messages:', err);
-      setError(err.message || 'فشل في تحميل الرسائل');
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
     } finally {
       setLoading(false);
     }
   }, [conversationId]);
 
-  useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+  // Fetch conversation details
+  const fetchConversationDetails = useCallback(async () => {
+    if (!conversationId) return;
 
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single();
+
+      if (error) throw error;
+      setConversationDetails(data);
+    } catch (error) {
+      console.error('Error fetching conversation details:', error);
+    }
+  }, [conversationId]);
+
+  // Initialize real-time subscription
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!conversationId) return;
+
+    // Clean up previous subscription
+    if (messagesChannelRef.current) {
+      supabase.removeChannel(messagesChannelRef.current);
+    }
+
+    // Set up new subscription
+    const channel = supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload: any) => {
+          const newMessage = payload.new as any;
+          let signedUrl = null;
+
+          if (newMessage.message_type !== 'text') {
+            const { data: signedUrlData } = await supabase.storage
+              .from('call-files')
+              .createSignedUrl(newMessage.content, 3600);
+            signedUrl = signedUrlData?.signedUrl || null;
+          }
+
+          const formattedNewMessage: Message = {
+            id: newMessage.id,
+            conversationId: newMessage.conversation_id,
+            text: newMessage.content,
+            senderId: newMessage.sender_id,
+            timestamp: new Date(newMessage.created_at).toISOString(),
+            message_type: newMessage.message_type,
+            caption: newMessage.caption,
+            media_metadata: newMessage.media_metadata,
+            signedUrl,
+          };
+
+          setMessages((currentMessages) => [...currentMessages, formattedNewMessage]);
+        }
+      )
+      .subscribe();
+
+    messagesChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [conversationId]);
+
+  // Initial data fetch
+  useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+      fetchConversationDetails();
+    }
+  }, [conversationId, fetchMessages, fetchConversationDetails]);
+
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
   }, [messages]);
 
-  const uploadFile = async (file: File, _type: string): Promise<string | null> => {
-    if (!file || !conversationId) return null;
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || !conversationId || !user) return;
+
+      try {
+        const { data, error } = await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: text.trim(),
+          message_type: 'text',
+        }).select();
+
+        if (error) throw error;
+
+        // Optimistically update the UI
+        if (data && data.length > 0) {
+          const newMessage = data[0];
+          setMessages((currentMessages) => [
+            ...currentMessages,
+            {
+              id: newMessage.id,
+              conversationId: newMessage.conversation_id,
+              text: newMessage.content,
+              senderId: newMessage.sender_id,
+              timestamp: new Date(newMessage.created_at).toISOString(),
+              message_type: 'text' as const,
+              signedUrl: null,
+            },
+          ]);
+        }
+
+        await supabase
+          .from('user_conversation_settings')
+          .upsert(
+            {
+              user_id: user.id,
+              conversation_id: conversationId,
+              is_hidden: false,
+              hidden_at: null,
+            },
+            { onConflict: 'user_id,conversation_id' }
+          );
+
+      } catch (err: any) {
+        console.error('Error sending message:', err);
+        throw err;
+      }
+    },
+    [conversationId, user]
+  );
+
+  const sendFileMessage = async (file: File, messageType: 'image' | 'video' | 'audio' | 'file') => {
+    if (!file) return;
 
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('المستخدم غير مسجل الدخول');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session || !session.user) throw new Error("User is not authenticated for upload.");
+        
+        const user = session.user;
 
-      const fileExt = file.name.split('.').pop();
-      const uniqueFileName = `${user.id}/${Date.now()}_${conversationId}.${fileExt}`;
-      const filePath = `public/${uniqueFileName}`;
-      
-      // تحديد نوع المحتوى المناسب للملف
-      let contentType = file.type;
-      if (_type === 'audio') {
-        // تحديد نوع المحتوى بناءً على امتداد الملف
-        if (fileExt === 'mp3') {
-          contentType = 'audio/mpeg';
-        } else if (fileExt === 'wav') {
-          contentType = 'audio/wav';
-        } else if (fileExt === 'ogg') {
-          contentType = 'audio/ogg';
-        } else if (fileExt === 'm4a' || fileExt === 'aac') {
-          contentType = 'audio/mp4';
-        } else if (fileExt === 'flac') {
-          contentType = 'audio/flac';
-        } else {
-          // للملفات الصوتية الأخرى مثل .dat
-          contentType = 'audio/webm';
-        }
-      }
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}_${Date.now()}.${fileExt}`;
+        const filePath = `public/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('call-files')
-        .upload(filePath, file, {
-          contentType: contentType,
-          upsert: false,
+        await new Promise<void>((resolve, reject) => {
+            const upload = new tus.Upload(file, {
+                endpoint: `${supabaseUrl}/storage/v1/upload/resumable`,
+                retryDelays: [0, 3000, 5000, 10000, 20000],
+                headers: {
+                    authorization: `Bearer ${session.access_token}`,
+                    'x-upsert': 'true',
+                },
+                metadata: {
+                    bucketName: 'call-files',
+                    objectName: filePath,
+                    contentType: file.type,
+                },
+                chunkSize: 6 * 1024 * 1024,
+                onError: (error) => {
+                    console.error("Failed because: ", error);
+                    reject(error);
+                },
+                onProgress: (bytesUploaded, bytesTotal) => {
+                    const percentage = (bytesUploaded / bytesTotal * 100).toFixed(2);
+                    setUploadProgress(Number(percentage));
+                },
+                onSuccess: async () => {
+                    const { data: newMessage, error: insertError } = await supabase.from('messages').insert({
+                        conversation_id: conversationId,
+                        sender_id: user.id,
+                        content: filePath,
+                        message_type: messageType,
+                    }).select().single();
+
+                    if (insertError) {
+                        reject(insertError);
+                    } else if (newMessage) {
+                        const { data: signedUrlData } = await supabase.storage.from('call-files').createSignedUrl(newMessage.content, 3600);
+
+                        const formattedNewMessage: Message = {
+                            id: newMessage.id,
+                            conversationId: newMessage.conversation_id,
+                            text: newMessage.content,
+                            senderId: newMessage.sender_id,
+                            timestamp: new Date(newMessage.created_at).toISOString(),
+                            message_type: newMessage.message_type as 'image' | 'video' | 'audio' | 'file',
+                            caption: newMessage.caption,
+                            media_metadata: newMessage.media_metadata,
+                            signedUrl: signedUrlData?.signedUrl || null,
+                        };
+
+                        setMessages(currentMessages => [...currentMessages, formattedNewMessage]);
+                        await supabase
+                            .from('user_conversation_settings')
+                            .upsert(
+                                {
+                                    user_id: user.id,
+                                    conversation_id: conversationId,
+                                    is_hidden: false,
+                                    hidden_at: null,
+                                },
+                                { onConflict: 'user_id,conversation_id' }
+                            );
+                        resolve();
+                    }
+                },
+            });
+            upload.start();
         });
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      return filePath;
-
     } catch (error) {
-      console.error('Error uploading file:', error);
-      return null;
+        console.error(`Error sending ${messageType} message:`, error);
+        alert(`فشل إرسال الملف: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
     } finally {
-      setIsUploading(false);
-      setUploadProgress(100);
-    }
-  };
-
-  const sendFileMessage = async (file: File, messageType: 'image' | 'video' | 'audio' | 'file') => {
-    if (!file) return;
-
-    try {
-      const filePath = await uploadFile(file, messageType);
-      if (!filePath) throw new Error('File upload failed to return a path.');
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not logged in');
-
-      const { data: insertedData, error: insertError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          content: filePath,
-          sender_id: user.id,
-          message_type: messageType,
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('call-files')
-        .createSignedUrl(filePath, 3600);
-
-      if (signedUrlError) throw signedUrlError;
-
-      const newMessage: Message = {
-        id: insertedData.id,
-        conversationId: insertedData.conversation_id,
-        text: insertedData.content,
-        senderId: insertedData.sender_id,
-        timestamp: new Date(insertedData.created_at).toISOString(),
-        message_type: insertedData.message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
-        signedUrl: signedUrlData.signedUrl,
-      };
-
-      setMessages(currentMessages => [...currentMessages, newMessage]);
-
-    } catch (error) {
-      console.error(`Error sending ${messageType} message:`, error);
-      alert(`فشل إرسال الملف: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
-    }
-  };
-
-  const sendMessage = async (text: string): Promise<void> => {
-    if (!conversationId || !text.trim()) return;
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        throw new Error('المستخدم غير مسجل الدخول');
-      }
-
-      const { data, error: insertError } = await supabase
-        .from('messages')
-        .insert([
-          {
-            conversation_id: conversationId,
-            content: text,
-            sender_id: user.id,
-            message_type: 'text',
-          }
-        ]).select('*');
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      if (data && data.length > 0) {
-        const newMessage: Message = {
-          id: data[0].id,
-          conversationId: data[0].conversation_id,
-          text: data[0].content,
-          senderId: data[0].sender_id,
-          timestamp: new Date(data[0].created_at).toISOString(),
-          message_type: (data[0] as any).message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
-          signedUrl: null
-        };
-        setMessages(currentMessages => [...currentMessages, newMessage]);
-      }
-
-      await supabase
-        .from('user_conversation_settings')
-        .upsert(
-          {
-            user_id: user.id,
-            conversation_id: conversationId,
-            is_hidden: false,
-            hidden_at: null,
-          },
-          { onConflict: 'user_id,conversation_id' }
-        );
-
-    } catch (err: any) {
-      console.error('Error sending message:', err);
-      throw err;
+        setIsUploading(false);
+        setUploadProgress(0);
     }
   };
 
@@ -240,17 +320,15 @@ export const useMessages = (conversationId: string) => {
       let messageType: 'image' | 'video' | 'audio' | 'file' = 'file'; // Default to file
       const fileName = file.name.toLowerCase();
       const fileExt = fileName.split('.').pop() || '';
-      
-      // قائمة الامتدادات الصوتية المدعومة
+
       const audioExtensions = ['dat', 'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma'];
-      
+
       if (file.type.startsWith('image/')) {
         messageType = 'image';
       } else if (file.type.startsWith('video/')) {
         messageType = 'video';
       } else if (file.type.startsWith('audio/') || audioExtensions.includes(fileExt)) {
         messageType = 'audio';
-        // فرض نوع MIME صحيح للملفات الصوتية
         if (!file.type || file.type === '' || file.type === 'application/octet-stream') {
           Object.defineProperty(file, 'type', {
             writable: true,
@@ -265,147 +343,38 @@ export const useMessages = (conversationId: string) => {
     input.click();
   };
 
-  const sendAudioMessage = async (audioBlob: Blob, duration: number, caption: string = '') => {
-    if (!audioBlob || !conversationId) return;
+  const sendAudioMessage = async (audioBlob: Blob, _duration: number, _caption: string = '') => {
+    if (!audioBlob) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    // تحويل Blob إلى File لاستخدامه في sendFileMessage
+    const fileName = `recording_${Date.now()}.webm`;
+    const contentType = audioBlob.type || 'audio/webm';
+    const audioFile = new File([audioBlob], fileName, { type: contentType });
 
-    try {
-      // التحقق من المستخدم
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('المستخدم غير مسجل الدخول');
-
-      // إنشاء اسم فريد للملف
-      const fileExt = 'webm';
-      const uniqueFileName = `${user.id}/${Date.now()}_${conversationId}.${fileExt}`;
-      const filePath = `public/${uniqueFileName}`;
-
-      // رفع الملف إلى التخزين
-      const { error: uploadError } = await supabase.storage
-        .from('call-files')
-        .upload(filePath, audioBlob, {
-          contentType: 'audio/webm',
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // إنشاء رابط موقّع
-      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-        .from('call-files')
-        .createSignedUrl(filePath, 3600);
-
-      if (signedUrlError) throw signedUrlError;
-
-      // إدخال الرسالة في قاعدة البيانات
-      const { data: insertedData, error: insertError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          content: filePath,
-          sender_id: user.id,
-          message_type: 'audio',
-          caption: caption || null,
-          media_metadata: { duration: duration },
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      // إضافة الرسالة إلى القائمة المحلية
-      const newMessage: Message = {
-        id: insertedData.id,
-        conversationId: insertedData.conversation_id,
-        text: insertedData.content,
-        senderId: insertedData.sender_id,
-        timestamp: new Date(insertedData.created_at).toISOString(),
-        message_type: 'audio',
-        signedUrl: signedUrlData.signedUrl,
-        caption: insertedData.caption,
-        media_metadata: insertedData.media_metadata,
-      };
-
-      setMessages(currentMessages => [...currentMessages, newMessage]);
-
-      // تحديث إعدادات المحادثة
-      await supabase
-        .from('user_conversation_settings')
-        .upsert(
-          {
-            user_id: user.id,
-            conversation_id: conversationId,
-            is_hidden: false,
-            hidden_at: null,
-          },
-          { onConflict: 'user_id,conversation_id' }
-        );
-
-    } catch (error) {
-      console.error('Error sending audio message:', error);
-      throw error;
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(100);
-    }
+    // استخدام نفس المسار المستخدم لإرسال الملفات الصوتية من الاستوديو
+    await sendFileMessage(audioFile, 'audio');
+    return;
   };
-
-  const markMessagesAsRead = useCallback(async (): Promise<void> => {
-    // يمكنك إضافة منطق تحديث حالة الرسائل هنا في المستقبل
-  }, [conversationId]);
 
 
   useEffect(() => {
     if (!conversationId) return;
 
     const messagesChannel = supabase
-      .channel(`chat-room-${conversationId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`
-      }, async (payload: any) => {
-        const rawMessage = payload.new;
-
-        const {data: {user}} = await supabase.auth.getUser();
-        if (rawMessage.sender_id === user?.id) {
-          return;
+      .channel(`conversation-updates:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`,
+        },
+        (payload: any) => {
+          const { new: updatedConversation } = payload;
+          setConversationDetails(updatedConversation);
         }
-
-        const formattedMessage: Message = {
-          id: rawMessage.id,
-          conversationId: rawMessage.conversation_id,
-          text: rawMessage.content,
-          senderId: rawMessage.sender_id,
-          timestamp: new Date(rawMessage.created_at).toISOString(),
-          message_type: (rawMessage as any).message_type as 'text' | 'image' | 'video' | 'audio' | 'file',
-          signedUrl: null,
-        };
-
-        if (((formattedMessage as any).message_type === 'image' || (formattedMessage as any).message_type === 'video' || (formattedMessage as any).message_type === 'audio' || (formattedMessage as any).message_type === 'file') && formattedMessage.text) {
-            const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-              .from('call-files')
-              .createSignedUrl(formattedMessage.text, 3600);
-
-            if (signedUrlError) {
-              console.error('Failed to get signed URL for incoming message:', signedUrlError);
-            } else {
-                formattedMessage.signedUrl = signedUrlData.signedUrl;
-            }
-        }
-
-        setMessages(currentMessages => [...currentMessages, formattedMessage]);
-      })
-      .on('postgres_changes', {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`
-      }, (payload: any) => {
-        setMessages(currentMessages => currentMessages.filter(msg => msg.id !== payload.old.id));
-      })
+      )
       .subscribe();
 
     return () => {
@@ -413,17 +382,16 @@ export const useMessages = (conversationId: string) => {
     };
   }, [conversationId]);
 
-
   return {
     messages,
     loading,
-    error,
     sendMessage,
-    markMessagesAsRead,
     messagesEndRef,
     isUploading,
     uploadProgress,
     pickAndSendMedia,
     sendAudioMessage,
+    conversationDetails,
+    scrollToBottom,
   };
 };

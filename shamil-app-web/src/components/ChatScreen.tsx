@@ -110,12 +110,13 @@ const ChatScreen: React.FC = () => {
   };
 
   // دالة معدلة لإرسال التسجيل الصوتي مع النص ككابشن
-  const handleSendRecordingWithCaption = async (caption?: string) => {
+  const handleSendRecordingWithCaption = async (caption?: string): Promise<boolean> => {
+    let success = false;
     try {
       setIsSending(true);
       
       // استدعاء دالة إرسال التسجيل الصوتي مع النص ككابشن
-      const success = await handleSendRecording(caption);
+      success = await handleSendRecording(caption);
       
       if (success) {
         // التمرير إلى آخر رسالة بعد الإرسال
@@ -130,9 +131,12 @@ const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('فشل في إرسال الرسالة الصوتية:', error);
       toast.error('فشل في إرسال الرسالة الصوتية، حاول مرة أخرى');
+      return false;
     } finally {
       setIsSending(false);
     }
+    
+    return success;
   };
 
   return (

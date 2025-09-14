@@ -21,7 +21,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, m
     
     return (
       <div
-        key={message.id}
+        key={`${message.id}-${Math.random().toString(36).substr(2, 9)}`}
         className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
       >
         <MessageBubble

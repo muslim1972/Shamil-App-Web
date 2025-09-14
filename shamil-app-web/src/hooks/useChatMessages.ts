@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { useAuth } from '../context/AuthContext';
-import { useMessages } from '../hooks/useMessages';
+import { useChatMessages as useMessages } from './useMessages';
 import { supabase } from '../services/supabase';
 
 interface UseChatMessagesProps {
@@ -18,7 +18,7 @@ interface ConversationDetails {
 
 export const useChatMessages = ({ conversationId }: UseChatMessagesProps = {}) => {
   const { user } = useAuth();
-  const { messages, loading, error, sendMessage, markMessagesAsRead, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage } = useMessages(conversationId || '');
+  const { messages, loading, sendMessage, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage } = useMessages({ conversationId });
   const [conversationDetails, setConversationDetails] = useState<ConversationDetails | null>(null);
   
   // Ref for messages container
@@ -85,10 +85,8 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps = {}) =
   }, [fetchConversationDetails]);
 
   useEffect(() => {
-    if (conversationId) {
-      markMessagesAsRead();
-    }
-  }, [conversationId, markMessagesAsRead]);
+    // تم إزالة markMessagesAsRead لأنها غير موجودة في useMessages
+  }, [conversationId]);
 
   // التمرير إلى آخر رسالة عند تحديث الرسائل أو اكتمال التحميل
   useEffect(() => {
@@ -104,9 +102,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps = {}) =
   return {
     messages,
     loading,
-    error,
     sendMessage,
-    markMessagesAsRead,
     messagesEndRef,
     isUploading,
     pickAndSendMedia,

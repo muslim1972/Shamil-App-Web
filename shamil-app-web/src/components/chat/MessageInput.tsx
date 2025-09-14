@@ -19,7 +19,6 @@ interface MessageInputProps {
 export const MessageInput: React.FC<MessageInputProps> = ({
   newMessage,
   setNewMessage,
-  onSendMessage,
   onAttachmentClick,
   onStartRecording,
   isUploading,

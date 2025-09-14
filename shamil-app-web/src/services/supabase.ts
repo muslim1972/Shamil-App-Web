@@ -1,7 +1,7 @@
 import { createClient, type AuthFlowType } from '@supabase/supabase-js';
 
 // استخدم متغيرات البيئة أو قيم افتراضية للتطوير
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-id.supabase.co';
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project-id.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
 
 // إعدادات المصادقة

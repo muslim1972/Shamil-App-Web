@@ -1,2 +1,2 @@
 export { useConversations } from './useConversations';
-export { useMessages } from './useMessages';
+export { useChatMessages as useMessages } from './useMessages';
