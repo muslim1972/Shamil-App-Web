@@ -81,6 +81,14 @@ const ChatScreen: React.FC = () => {
       await messagePromise;
       scrollToBottom();
       toast.success('تم إرسال الرسالة');
+
+      // التركيز على حقل الإدخال بعد إرسال الرسالة
+      setTimeout(() => {
+        const inputElement = document.querySelector('textarea') as HTMLTextAreaElement;
+        if (inputElement) {
+          inputElement.focus();
+        }
+      }, 100);
     } catch (error) {
       console.error('فشل في إرسال الرسالة:', error);
       toast.error('فشل في إرسال الرسالة، حاول مرة أخرى');

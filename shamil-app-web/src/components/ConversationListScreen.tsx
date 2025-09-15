@@ -7,7 +7,7 @@ import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LogOut, MessageSquarePlus, Search, Archive, Lock, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
+import { LogOut, MessageSquarePlus, Archive, Lock, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import SearchDialog from './SearchDialog';
 import { supabase } from '../services/supabase';
@@ -66,7 +66,7 @@ const ConversationListScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const { conversations, loading, error, fetchConversations, setConversations } = useConversations();
-  const [searchTerm, setSearchTerm] = useState('');
+
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
   const [showQRMenu, setShowQRMenu] = useState(false);
   const longPressTriggered = useRef(false); // Ref to prevent click after long press
@@ -139,9 +139,8 @@ const ConversationListScreen: React.FC = () => {
 
     try {
       // إنشاء محادثة جديدة أو الحصول على محادثة موجودة
-      const { data, error } = await supabase.rpc('create_or_get_conversation', {
-        p_user1_id: user.id,
-        p_user2_id: userId
+      const { data, error } = await supabase.rpc('create_or_get_conversation_with_user', {
+        p_other_user_id: userId
       });
 
       if (error) {
@@ -177,19 +176,13 @@ const ConversationListScreen: React.FC = () => {
 
   const handleCreateNewConversation = useCallback(() => { navigate('/users'); }, [navigate]);
   const handleLogout = useCallback(async () => { /* ... */ }, [signOut, navigate]);
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => { setSearchTerm(e.target.value); }, []);
-
-  const filteredConversations = useMemo(() =>
-    conversations.filter(c => (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())),
-    [conversations, searchTerm]
-  );
 
   if (loading) { return <div>Loading...</div>; }
   if (error) { return <div>Error...</div>; }
 
   return (
-    <div className="h-screen bg-slate-100 dark:bg-slate-900 flex justify-center">
-      <main className="w-full max-w-2xl h-screen flex flex-col bg-white dark:bg-slate-800 shadow-2xl">
+    <div className="h-screen bg-slate-100 dark:bg-slate-900">
+      <main className="w-full h-full flex flex-col bg-white dark:bg-slate-800 shadow-2xl sm:max-w-2xl sm:mx-auto">
 
         {/* Header */}
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-lg p-4 shadow-sm border-b border-slate-200 dark:border-slate-700 z-10">
@@ -209,13 +202,10 @@ const ConversationListScreen: React.FC = () => {
           </div>
           <div className="mt-4 flex justify-between items-center">
             <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3 rtl:pl-0 rtl:right-3"><Search size={20} /></span>
-              <input
-                type="text"
-                placeholder="بحث عن محادثة..."
-                className="w-full p-2 pl-10 rtl:pr-10 rounded-lg bg-slate-200 dark:bg-slate-700"
-                value={searchTerm}
-                onChange={handleSearchChange}
+              <SearchDialog
+                onOpenConversation={handleCreateConversation}
+                onGenerateQR={handleGenerateQR}
+                onOpenCamera={handleOpenCamera}
               />
             </div>
             <div className="relative">
@@ -268,7 +258,7 @@ const ConversationListScreen: React.FC = () => {
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           <ul>
-            {filteredConversations.map((conversation) => (
+            {conversations.map((conversation) => (
               <div key={conversation.id} data-id={conversation.id} {...longPressEvents}>
                 <ConversationItem conversation={conversation} onSelect={handleSelectConversation} />
               </div>
@@ -294,12 +284,7 @@ const ConversationListScreen: React.FC = () => {
         </Menu>
       </Transition>
 
-      {/* Search Component */}
-      <SearchDialog
-        onOpenConversation={handleCreateConversation}
-        onGenerateQR={handleGenerateQR}
-        onOpenCamera={handleOpenCamera}
-      />
+
     </div>
   );
 };

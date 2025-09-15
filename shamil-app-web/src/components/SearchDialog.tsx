@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Search, QrCode, Camera, Image, MessageSquarePlus } from 'lucide-react';
+import { Search, Camera, Image, MessageSquarePlus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useSearchStore } from '@/stores/searchStore';
@@ -38,19 +38,37 @@ const SearchDialog: React.FC<SearchDialogProps> = ({
     queryFn: async () => {
       if (!searchText.trim()) return [];
 
-      // تحسين البحث ليعمل بشكل أفضل مع البداية وليس يحتوي فقط
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, email, avatar_url')
-        .or(`username.ilike.${searchText}%,email.ilike.${searchText}%`)
-        .limit(10);
+      // البحث في جميع المستخدمين أولاً للتحقق من وجود البيانات
+      const { data: allUsers, error: allUsersError } = await supabase
+        .from('users')
+        .select('id, username, email, display_name');
 
-      if (error) {
-        toast.error('حدث خطأ أثناء البحث');
+      if (allUsersError) {
+        toast.error('حدث خطأ أثناء البحث في قاعدة البيانات');
         return [];
       }
 
-      return data || [];
+      if (!allUsers || allUsers.length === 0) {
+        return [];
+      }
+
+      // البحث اليدوي في النتائج
+      const searchLower = searchText.trim().toLowerCase();
+
+      const foundUsers = allUsers.filter((u) => {
+        // التحقق من تطابق اسم المستخدم
+        const usernameMatch = u.username && u.username.toLowerCase().includes(searchLower);
+
+        // التحقق من تطابق البريد الإلكتروني
+        const emailMatch = u.email && u.email.toLowerCase().includes(searchLower);
+
+        // التحقق من تطابق اسم العرض
+        const displayNameMatch = u.display_name && u.display_name.toLowerCase().includes(searchLower);
+
+        return usernameMatch || emailMatch || displayNameMatch;
+      });
+
+      return foundUsers || [];
     },
     enabled: searchText.length > 0,
   });
@@ -76,10 +94,6 @@ const SearchDialog: React.FC<SearchDialogProps> = ({
     toast.success(`تم فتح محادثة مع ${user.username}`);
   };
 
-  const handleQRMenuToggle = () => {
-    setShowQRMenu(!showQRMenu);
-  };
-
   const handleGenerateQR = () => {
     setShowQRMenu(false);
     onGenerateQR();
@@ -102,16 +116,20 @@ const SearchDialog: React.FC<SearchDialogProps> = ({
           className="pl-10 pr-12 py-3 text-right border-2 border-indigo-200 focus:border-indigo-500 rounded-lg shadow-sm transition-colors"
           dir="rtl"
         />
-        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleQRMenuToggle}
-            className="h-8 w-8 text-indigo-600 hover:bg-indigo-100 rounded-full"
-          >
-            <QrCode className="h-5 w-5" />
-          </Button>
-        </div>
+        {searchText && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchText('')}
+              className="h-8 w-8 text-indigo-600 hover:bg-indigo-100 rounded-full"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* قائمة خيارات QR */}

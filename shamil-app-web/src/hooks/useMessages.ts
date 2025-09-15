@@ -184,18 +184,40 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
         // Optimistically update the UI
         if (data && data.length > 0) {
           const newMessage = data[0];
+          const tempMessageId = `temp-${Date.now()}`;
+
+          // إضافة رسالة مؤقتة أثناء الإرسال
           setMessages((currentMessages) => [
             ...currentMessages,
             {
-              id: newMessage.id,
+              id: tempMessageId,
               conversationId: newMessage.conversation_id,
               text: newMessage.content,
               senderId: newMessage.sender_id,
-              timestamp: new Date(newMessage.created_at).toISOString(),
+              timestamp: new Date().toISOString(),
               message_type: 'text' as const,
               signedUrl: null,
             },
           ]);
+
+          // بعد استلام الرسالة من الخادم، استبدال الرسالة المؤقتة بالرسالة الفعلية
+          setTimeout(() => {
+            setMessages((currentMessages) => 
+              currentMessages.map(msg => 
+                msg.id === tempMessageId 
+                  ? {
+                      id: newMessage.id,
+                      conversationId: newMessage.conversation_id,
+                      text: newMessage.content,
+                      senderId: newMessage.sender_id,
+                      timestamp: new Date(newMessage.created_at).toISOString(),
+                      message_type: 'text' as const,
+                      signedUrl: null,
+                    }
+                  : msg
+              )
+            );
+          }, 1000);
         }
 
         await supabase

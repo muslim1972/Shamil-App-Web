@@ -39,14 +39,29 @@ export const MessageForm: React.FC<MessageFormProps> = ({
   handleSendLocation,
   disabled = false
 }) => {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // التركيز على حقل الإدخال عند فتح المحادثة
+  // التركيز على حقل الإدخال عند فتح المحادثة وعند إرسال الرسالة
   useEffect(() => {
     if (inputRef.current && !isRecording && !isUploading) {
       inputRef.current.focus();
     }
   }, [isRecording, isUploading]);
+
+  // التركيز على حقل الإدخال بعد تغيير النص
+  useEffect(() => {
+    if (inputRef.current && !isRecording && !isUploading) {
+      inputRef.current.focus();
+    }
+  }, [newMessage]);
+
+  // ضبط ارتفاع textarea تلقائيًا بناءً على محتواه
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
+    }
+  }, [newMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز

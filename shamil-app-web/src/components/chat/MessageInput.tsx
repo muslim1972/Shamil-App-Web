@@ -2,7 +2,7 @@
 // This component handles the message input field and related buttons
 
 import React from 'react';
-import { Paperclip, Send, Mic } from 'lucide-react';
+import { Paperclip, Send, Mic, CornerDownLeft } from 'lucide-react';
 
 interface MessageInputProps {
   newMessage: string;
@@ -12,7 +12,7 @@ interface MessageInputProps {
   onStartRecording: () => void;
   isUploading: boolean;
   isRecording: boolean;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
   disabled?: boolean;
 }
 
@@ -33,11 +33,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // التحقق مما إذا كان النص طويلاً جداً
   const isTextTooLong = remainingCharacters < 0;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     // تحديد طول النص إلى الحد الأقصى
     if (text.length <= maxCharacters) {
       setNewMessage(text);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // إرسال الرسالة عند الضغط على Enter بدون Shift
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!disabled) {
+        onSendMessage(e as any);
+      }
     }
   };
 
@@ -59,18 +69,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </button>
 
         <div className="flex-1 relative mx-2 min-w-0">
-          <input
-            type="text"
+          <textarea
             ref={inputRef}
             value={newMessage}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             placeholder="اكتب رسالة..."
-            className={`w-full border rounded-full py-2 px-4 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
+            rows={1}
+            className={`w-full border rounded-2xl py-2 px-4 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${
               isTextTooLong
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-gray-300 focus:ring-indigo-500'
             } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             disabled={disabled}
+            style={{ maxHeight: '120px' }}
             onFocus={(e) => {
               // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز
               e.preventDefault();
@@ -94,18 +106,45 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
 
         {newMessage.length > 0 ? (
-          <button
-            type="submit"
-            disabled={disabled || isTextTooLong || isRecording}
-            className={`rounded-full p-3 flex-shrink-0 transition-all ${
-              disabled || isTextTooLong || isRecording
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-            } text-white`}
-            aria-label="إرسال الرسالة"
-          >
-            <Send size={20} />
-          </button>
+          <div className="flex space-x-1">
+            <button
+              type="button"
+              onClick={() => {
+                if (inputRef.current) {
+                  const currentValue = newMessage;
+                  setNewMessage(currentValue + '\n');
+                  // التركيز على حقل الإدخال بعد إضافة السطر الجديد
+                  setTimeout(() => {
+                    if (inputRef.current) {
+                      inputRef.current.focus();
+                      inputRef.current.selectionStart = inputRef.current.value.length;
+                    }
+                  }, 0);
+                }
+              }}
+              disabled={disabled || isTextTooLong || isRecording}
+              className={`rounded-full p-2 flex-shrink-0 transition-all ${
+                disabled || isTextTooLong || isRecording
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+              } text-indigo-600`}
+              aria-label="سطر جديد"
+            >
+              <CornerDownLeft size={18} className="transform -rotate-90" />
+            </button>
+            <button
+              type="submit"
+              disabled={disabled || isTextTooLong || isRecording}
+              className={`rounded-full p-3 flex-shrink-0 transition-all ${
+                disabled || isTextTooLong || isRecording
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+              } text-white`}
+              aria-label="إرسال الرسالة"
+            >
+              <Send size={20} />
+            </button>
+          </div>
         ) : (
           <button
             type="button"
