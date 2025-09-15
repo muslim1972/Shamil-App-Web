@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, Fragment, useRef } fr
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConversations } from '../hooks/useConversations';
+import { useConversationListActions } from '../hooks/useConversationListActions';
 import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
@@ -61,10 +62,19 @@ ConversationItem.displayName = 'ConversationItem';
 const ConversationListScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { conversations, loading, error } = useConversations();
+  const { conversations, loading, error, fetchConversations, setConversations } = useConversations();
   const [searchTerm, setSearchTerm] = useState('');
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
   const longPressTriggered = useRef(false); // Ref to prevent click after long press
+
+  // استخدام دوال إجراءات المحادثات
+  const {
+    handleConversationOptions,
+    handleArchiveConversation,
+    handleHideConversation,
+    handleDeleteConversationForAll,
+    closeActionMenu
+  } = useConversationListActions(setConversations, fetchConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target) return;
@@ -76,16 +86,20 @@ const ConversationListScreen: React.FC = () => {
 
     if (!conversation) return;
 
+    // استخدام دالة التعامل مع خيارات المحادثة الجديدة
+    handleConversationOptions(conversation);
+
     // We need to get the position from the element itself if the event is stale
     const rect = targetElement.getBoundingClientRect();
     setMenu({ x: rect.left, y: rect.bottom, conversation });
 
-  }, [conversations]);
+  }, [conversations, handleConversationOptions]);
 
   const longPressEvents = useLongPress(handleLongPress, { delay: 500 });
 
   const handleCloseMenu = () => {
     setMenu(null);
+    closeActionMenu();
   };
 
   useEffect(() => {
@@ -127,6 +141,9 @@ const ConversationListScreen: React.FC = () => {
               <button onClick={handleCreateNewConversation} aria-label="محادثة جديدة">
                 <MessageSquarePlus size={20} />
               </button>
+              <button onClick={() => navigate('/archived')} aria-label="المحادثات المؤرشفة">
+                <Archive size={20} />
+              </button>
               <button onClick={handleLogout} aria-label="تسجيل الخروج">
                 <LogOut size={20} />
               </button>
@@ -166,11 +183,11 @@ const ConversationListScreen: React.FC = () => {
         <Menu as="div" className="fixed z-30" style={{ top: menu?.y, left: menu?.x }}>
           <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="py-1">
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />أرشفة المحادثة</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleArchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />أرشفة المحادثة</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Lock className="mr-3 h-5 w-5" />قفل المحادثة</button>)}</Menu.Item>
               <div className="px-4 my-1"><hr className="border-slate-200"/></div>
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي فقط</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي فقط</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Ban className="mr-3 h-5 w-5" />حظر المستخدم</button>)}</Menu.Item>
             </div>
           </Menu.Items>

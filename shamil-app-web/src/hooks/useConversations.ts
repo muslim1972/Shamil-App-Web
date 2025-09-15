@@ -49,5 +49,7 @@ export const useConversations = () => {
     conversations,
     loading,
     error,
+    fetchConversations,
+    setConversations,
   };
 };

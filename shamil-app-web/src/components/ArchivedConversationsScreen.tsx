@@ -1,20 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useConversations } from '../hooks/useConversations';
+import { supabase } from '../services/supabase';
 import type { Conversation } from '../types';
+import { formatDistanceToNow } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 const ArchivedConversationsScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { conversations, loading, error } = useConversations();
+  const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
+  // جلب المحادثات المؤرشفة
+  const fetchArchivedConversations = useCallback(async () => {
     if (!user) {
       navigate('/auth');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_user_archived_conversations', { p_user_id: user.id });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data) {
+        const formattedConversations: Conversation[] = data.map((conv: any) => ({
+          id: conv.id,
+          name: conv.other_username,
+          participants: conv.participants,
+          lastMessage: conv.last_message,
+          timestamp: conv.updated_at,
+          unread: conv.unread_count > 0,
+          archived: true,
+        }));
+        setArchivedConversations(formattedConversations);
+      }
+    } catch (err: any) {
+      console.error('Error fetching archived conversations:', err);
+      setError(err.message || 'فشل في تحميل المحادثات المؤرشفة');
+    } finally {
+      setLoading(false);
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    fetchArchivedConversations();
+  }, [fetchArchivedConversations]);
 
   const handleSelectConversation = (conversationId: string) => {
     navigate(`/chat/${conversationId}`);
@@ -22,6 +62,24 @@ const ArchivedConversationsScreen: React.FC = () => {
 
   const handleBack = () => {
     navigate('/conversations');
+  };
+
+  const handleUnarchiveConversation = async (conversationId: string) => {
+    try {
+      const { error } = await supabase.rpc('unarchive_conversation', { 
+        p_conversation_id: conversationId 
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // تحديث القائمة بعد إلغاء الأرشفة
+      await fetchArchivedConversations();
+    } catch (err: any) {
+      console.error('Error unarchiving conversation:', err);
+      alert('فشل في إلغاء أرشفة المحادثة: ' + err.message);
+    }
   };
 
   const handleLogout = async () => {
@@ -33,13 +91,9 @@ const ArchivedConversationsScreen: React.FC = () => {
     }
   };
 
-  // تصفية المحادثات المؤرشفة فقط
-  const archivedConversations = conversations.filter(conversation => 
-    conversation.archived
-  );
-
+  // تصفية المحادثات المؤرشفة حسب مصطلح البحث
   const filteredConversations = archivedConversations.filter(conversation =>
-    conversation.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (conversation.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -126,24 +180,30 @@ const ArchivedConversationsScreen: React.FC = () => {
             {filteredConversations.map((conversation: Conversation) => (
               <li
                 key={conversation.id}
-                className={`p-4 hover:bg-gray-100 cursor-pointer transition-colors ${conversation.unread ? 'bg-blue-50' : ''}`}
+                className={`p-4 hover:bg-gray-100 transition-colors ${conversation.unread ? 'bg-blue-50' : ''}`}
                 onClick={() => handleSelectConversation(conversation.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (confirm('هل تريد إلغاء أرشفة هذه المحادثة؟')) {
+                    handleUnarchiveConversation(conversation.id);
+                  }
+                }}
               >
                 <div className="flex items-center">
                   <div className="flex-shrink-0 h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold">
-                    {conversation.name.charAt(0)}
+                    {(conversation.name || '#').charAt(0)}
                   </div>
                   <div className="ml-4 flex-1 min-w-0">
                     <div className="flex justify-between">
                       <h3 className={`text-sm font-medium truncate ${conversation.unread ? 'text-indigo-700 font-bold' : 'text-gray-900'}`}>
-                        {conversation.name}
+                        {conversation.name || 'مستخدم غير معروف'}
                       </h3>
                       <span className="text-xs text-gray-500">
-                        {conversation.timestamp}
+                        {conversation.timestamp ? formatDistanceToNow(new Date(conversation.timestamp), { addSuffix: true, locale: ar }) : ''}
                       </span>
                     </div>
                     <p className={`text-sm truncate ${conversation.unread ? 'text-indigo-600 font-medium' : 'text-gray-500'}`}>
-                      {conversation.lastMessage}
+                      {conversation.lastMessage || 'لا توجد رسائل بعد'}
                     </p>
                   </div>
                   {conversation.unread && (

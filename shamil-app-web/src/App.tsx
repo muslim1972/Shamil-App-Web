@@ -6,6 +6,7 @@ const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
 const ConversationListScreen = React.lazy(() => import('./components/ConversationListScreen'));
 const ChatScreen = React.lazy(() => import('./components/ChatScreen'));
 const UserListScreen = React.lazy(() => import('./components/UserListScreen'));
+const ArchivedConversationsScreen = React.lazy(() => import('./components/ArchivedConversationsScreen'));
 
 // Main component for routing
 const AppRoutes: React.FC = () => {
@@ -32,6 +33,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/conversations" element={user ? <ConversationListScreen /> : <Navigate to="/auth" />} />
         <Route path="/chat/:conversationId" element={user ? <ChatScreen /> : <Navigate to="/auth" />} />
         <Route path="/users" element={user ? <UserListScreen /> : <Navigate to="/auth" />} />
+        <Route path="/archived" element={user ? <ArchivedConversationsScreen /> : <Navigate to="/auth" />} />
       </Routes>
     </React.Suspense>
   );
