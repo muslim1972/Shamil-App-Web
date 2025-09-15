@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChatMessages } from '../hooks/useChatMessages';
@@ -9,42 +9,39 @@ import { MessageList } from './chat/MessageList';
 import { MessageForm } from './chat/MessageForm';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { Menu, Transition } from '@headlessui/react';
+import { Pin, Trash2, CheckSquare } from 'lucide-react';
+import type { Message } from '../types';
 
 const ChatScreen: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
-  useAuth(); // نستدعي useAuth بدون الحاجة لاستخراج المستخدم حالياً
+  const { user } = useAuth();
 
   // State
   const [newMessage, setNewMessage] = useState('');
   const [isAttachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [messageMenu, setMessageMenu] = useState<{ x: number; y: number; message: Message } | null>(null);
 
   // Custom hooks
-  const {
-    messages,
-    loading,
-    sendMessage,
-    messagesEndRef,
-    isUploading,
-    pickAndSendMedia,
-    sendAudioMessage,
-    conversationDetails,
-    scrollToBottom
-  } = useChatMessages({ conversationId });
-
-  const {
-    isRecording,
-    recordingDuration,
-    handleStartRecording,
-    handleCancelRecording,
-    handleSendRecording,
-  } = useRecording({ sendAudioMessage });
-
+  const { messages, loading, sendMessage, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage, conversationDetails, scrollToBottom } = useChatMessages({ conversationId });
+  const { isRecording, recordingDuration, handleStartRecording, handleCancelRecording, handleSendRecording } = useRecording({ sendAudioMessage });
   const { handleSendLocation } = useLocation({ sendMessage });
 
-  // Calculate display conversation name
+  // Menu Handlers
+  const handleMessageLongPress = useCallback((target: EventTarget | null, message: Message) => {
+    if (!target) return;
+    const targetElement = target as HTMLElement;
+    const rect = targetElement.getBoundingClientRect();
+    setMessageMenu({ x: rect.left, y: rect.bottom, message });
+  }, []);
+
+  const handleCloseMessageMenu = () => {
+    setMessageMenu(null);
+  };
+
   const displayConversationName = conversationDetails?.name || 'محادثة';
 
   // مراقبة حالة الاتصال بالإنترنت
@@ -72,7 +69,6 @@ const ChatScreen: React.FC = () => {
     e.preventDefault();
     if (newMessage.trim() === '' || !conversationId) return;
 
-    // التحقق من الاتصال بالإنترنت
     if (!isOnline) {
       toast.error('لا يوجد اتصال بالإنترنت');
       return;
@@ -80,18 +76,10 @@ const ChatScreen: React.FC = () => {
 
     try {
       setIsSending(true);
-      
-      // إرسال الرسالة وتفريغ الحقل
       const messagePromise = sendMessage(newMessage);
       setNewMessage('');
-
-      // انتظار اكتمال الإرسال
       await messagePromise;
-
-      // التمرير إلى آخر رسالة بعد الإرسال
       scrollToBottom();
-      
-      // إظهار رسالة نجاح
       toast.success('تم إرسال الرسالة');
     } catch (error) {
       console.error('فشل في إرسال الرسالة:', error);
@@ -105,23 +93,15 @@ const ChatScreen: React.FC = () => {
     navigate('/conversations');
   };
 
-  // دالة معدلة لإرسال التسجيل الصوتي مع النص ككابشن
   const handleSendRecordingWithCaption = async (caption?: string): Promise<boolean> => {
     let success = false;
     try {
       setIsSending(true);
-      
-      // استدعاء دالة إرسال التسجيل الصوتي مع النص ككابشن
       success = await handleSendRecording(caption);
-      
       if (success) {
-        // التمرير إلى آخر رسالة بعد الإرسال
         scrollToBottom();
-        
-        // إظهار رسالة نجاح
         toast.success('تم إرسال الرسالة الصوتية');
       } else {
-        // فشل الإرسال
         toast.error('فشل في إرسال الرسالة الصوتية، حاول مرة أخرى');
       }
     } catch (error) {
@@ -131,26 +111,18 @@ const ChatScreen: React.FC = () => {
     } finally {
       setIsSending(false);
     }
-    
     return success;
   };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* مؤشر حالة الاتصال */}
       {!isOnline && (
-        <div className="bg-red-500 text-white text-center py-1 text-sm">
-          غير متصل بالإنترنت
-        </div>
+        <div className="bg-red-500 text-white text-center py-1 text-sm">غير متصل بالإنترنت</div>
       )}
       
-      <ChatHeader
-        displayConversationName={displayConversationName}
-        onBack={handleBack}
-      />
+      <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-100" id="messages-container">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100" id="messages-container">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -163,16 +135,14 @@ const ChatScreen: React.FC = () => {
             messages={messages}
             loading={loading}
             messagesEndRef={messagesEndRef}
+            onMessageLongPress={handleMessageLongPress}
           />
         )}
       </div>
 
-      {/* Message Input */}
       <div className={`bg-white border-t border-gray-200 ${isSending ? 'opacity-75' : ''}`}>
         {isSending && (
-          <div className="text-center text-xs text-gray-500 py-1">
-            جاري الإرسال...
-          </div>
+          <div className="text-center text-xs text-gray-500 py-1">جاري الإرسال...</div>
         )}
         <MessageForm
           newMessage={newMessage}
@@ -191,6 +161,31 @@ const ChatScreen: React.FC = () => {
           disabled={!isOnline || isSending}
         />
       </div>
+
+      {/* Message Context Menu */}
+      <Transition as={Fragment} show={!!messageMenu}>
+        <div className="fixed inset-0 z-20" onClick={handleCloseMessageMenu} />
+      </Transition>
+      <Transition
+        as={Fragment}
+        show={!!messageMenu}
+        enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100"
+        leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95"
+      >
+        <Menu as="div" className="fixed z-30" style={{ top: messageMenu?.y, left: messageMenu?.x }}>
+          <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
+            <div className="py-1">
+              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><CheckSquare className="mr-3 h-5 w-5" />تأشير</button>)}</Menu.Item>
+              {messageMenu?.message?.senderId === user?.id && (
+                <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><Pin className="mr-3 h-5 w-5" />تثبيت</button>)}</Menu.Item>
+              )}
+              <div className="px-4 my-1"><hr /></div>
+              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><Trash2 className="mr-3 h-5 w-5" />حذف لدي</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف لدى الجميع</button>)}</Menu.Item>
+            </div>
+          </Menu.Items>
+        </Menu>
+      </Transition>
     </div>
   );
 };

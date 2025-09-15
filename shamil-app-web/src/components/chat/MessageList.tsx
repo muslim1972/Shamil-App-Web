@@ -1,6 +1,3 @@
-// MessageList Component
-// This component renders the list of messages
-
 import React, { useCallback } from 'react';
 import type { Message } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -10,27 +7,28 @@ interface MessageListProps {
   messages: Message[];
   loading: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
+  onMessageLongPress: (target: EventTarget | null, message: Message) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, messagesEndRef }) => {
+export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, messagesEndRef, onMessageLongPress }) => {
   const { user } = useAuth();
 
-  // استخدام useCallback لمنع إعادة إنشاء الدالة في كل مرة
   const renderMessage = useCallback((message: Message) => {
     const isOwnMessage = message.senderId === user?.id;
     
     return (
       <div
-        key={`${message.id}-${Math.random().toString(36).substr(2, 9)}`}
+        key={message.id} // Use stable key
         className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
       >
         <MessageBubble
           message={message}
           isOwnMessage={isOwnMessage}
+          onLongPress={onMessageLongPress}
         />
       </div>
     );
-  }, [user?.id]);
+  }, [user?.id, onMessageLongPress]);
 
   if (messages.length === 0) {
     return (

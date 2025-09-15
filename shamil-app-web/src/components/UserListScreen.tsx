@@ -31,9 +31,9 @@ const UserListScreen: React.FC = () => {
     navigate('/conversations');
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = (users || []).filter(user =>
+    (user.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -111,14 +111,14 @@ const UserListScreen: React.FC = () => {
                 onClick={() => handleCreateConversation(userItem.id)}
               >
                 <div className="flex-shrink-0 h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-800 font-bold">
-                  {userItem.name.charAt(0)}
+                  {(userItem.name || '#').charAt(0).toUpperCase()}
                 </div>
                 <div className="ml-4 flex-1 min-w-0">
                   <h3 className="text-sm font-medium text-gray-900 truncate">
-                    {userItem.name}
+                    {userItem.name || 'مستخدم غير معروف'}
                   </h3>
                   <p className="text-sm text-gray-500 truncate">
-                    {userItem.email}
+                    {userItem.email || ' '}
                   </p>
                 </div>
                 <div className="ml-2 flex-shrink-0">
