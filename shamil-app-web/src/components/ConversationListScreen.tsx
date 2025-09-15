@@ -7,8 +7,11 @@ import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LogOut, MessageSquarePlus, Search, Archive, Lock, Trash2, Ban } from 'lucide-react';
+import { LogOut, MessageSquarePlus, Search, Archive, Lock, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
+import SearchDialog from './SearchDialog';
+import { supabase } from '../services/supabase';
+import toast from 'react-hot-toast';
 
 // Component for each conversation item in the list
 const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = React.memo(({ conversation, onSelect }) => {
@@ -65,13 +68,14 @@ const ConversationListScreen: React.FC = () => {
   const { conversations, loading, error, fetchConversations, setConversations } = useConversations();
   const [searchTerm, setSearchTerm] = useState('');
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
+  const [showQRMenu, setShowQRMenu] = useState(false);
   const longPressTriggered = useRef(false); // Ref to prevent click after long press
+  // تم نقل وظيفة البحث إلى مكون SearchDialog
 
   // استخدام دوال إجراءات المحادثات
   const {
     handleConversationOptions,
     handleArchiveConversation,
-    handleHideConversation,
     handleDeleteConversationForAll,
     closeActionMenu
   } = useConversationListActions(setConversations, fetchConversations);
@@ -100,6 +104,60 @@ const ConversationListScreen: React.FC = () => {
   const handleCloseMenu = () => {
     setMenu(null);
     closeActionMenu();
+  };
+
+  // إغلاق قائمة QR عند النقر خارجها
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showQRMenu && !(event.target as Element).closest('.relative')) {
+        setShowQRMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showQRMenu]);
+
+  // تم نقل وظيفة البحث إلى مكون SearchDialog
+
+  const handleGenerateQR = () => {
+    // سيتم تنفيذ هذه الوظيفة في المرحلة الثانية
+    setShowQRMenu(false);
+    toast.success('سيتم إنشاء رمز QR');
+  };
+
+  const handleOpenCamera = () => {
+    // سيتم تنفيذ هذه الوظيفة في المرحلة الثانية
+    setShowQRMenu(false);
+    toast.success('سيتم فتح الكاميرا لقراءة رمز QR');
+  };
+
+  const handleCreateConversation = async (userId: string) => {
+    if (!user) return;
+
+    try {
+      // إنشاء محادثة جديدة أو الحصول على محادثة موجودة
+      const { data, error } = await supabase.rpc('create_or_get_conversation', {
+        p_user1_id: user.id,
+        p_user2_id: userId
+      });
+
+      if (error) {
+        toast.error('لم نتمكن من بدء المحادثة.');
+        console.error('Error creating/getting conversation:', error);
+        return;
+      }
+
+      if (data) {
+        // الانتقال إلى شاشة المحادثة
+        navigate(`/chat/${data}`);
+      }
+    } catch (err) {
+      console.error('Error in handleCreateConversation:', err);
+      toast.error('حدث خطأ أثناء إنشاء المحادثة');
+    }
   };
 
   useEffect(() => {
@@ -149,8 +207,8 @@ const ConversationListScreen: React.FC = () => {
               </button>
             </div>
           </div>
-          <div className="mt-4">
-            <div className="relative">
+          <div className="mt-4 flex justify-between items-center">
+            <div className="relative flex-1">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3 rtl:pl-0 rtl:right-3"><Search size={20} /></span>
               <input
                 type="text"
@@ -159,6 +217,50 @@ const ConversationListScreen: React.FC = () => {
                 value={searchTerm}
                 onChange={handleSearchChange}
               />
+            </div>
+            <div className="relative">
+              <button
+                className="ml-2 p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-colors"
+                aria-label="بحث عن مستخدم"
+                onClick={() => setShowQRMenu(!showQRMenu)}
+              >
+                <QrCode size={20} />
+              </button>
+              {showQRMenu && (
+                <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border border-indigo-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border-b border-indigo-100 dark:border-indigo-800">
+                    <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">خيارات QR</div>
+                  </div>
+                  <button
+                    className="w-full text-right p-4 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                    onClick={handleGenerateQR}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-800/50 flex items-center justify-center ml-3">
+                        <Image className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-slate-800 dark:text-slate-100">من الاستوديو</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">إنشاء رمز QR من صورة</div>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    className="w-full text-right p-4 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors border-t border-slate-100 dark:border-slate-700"
+                    onClick={handleOpenCamera}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-800/50 flex items-center justify-center ml-3">
+                        <Camera className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-slate-800 dark:text-slate-100">باستخدام الكاميرا</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">فتح الكاميرا لمسح QR</div>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -184,15 +286,20 @@ const ConversationListScreen: React.FC = () => {
           <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="py-1">
               <Menu.Item>{({ active }) => (<button onClick={() => { handleArchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />أرشفة المحادثة</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Lock className="mr-3 h-5 w-5" />قفل المحادثة</button>)}</Menu.Item>
-              <div className="px-4 my-1"><hr className="border-slate-200"/></div>
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي فقط</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Lock className="mr-3 h-5 w-5" />إخفاء المحادثة</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => { handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Ban className="mr-3 h-5 w-5" />حظر المستخدم</button>)}</Menu.Item>
             </div>
           </Menu.Items>
         </Menu>
       </Transition>
+
+      {/* Search Component */}
+      <SearchDialog
+        onOpenConversation={handleCreateConversation}
+        onGenerateQR={handleGenerateQR}
+        onOpenCamera={handleOpenCamera}
+      />
     </div>
   );
 };

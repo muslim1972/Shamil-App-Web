@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { QueryProvider } from './providers/QueryProvider';
 
 const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
 const ConversationListScreen = React.lazy(() => import('./components/ConversationListScreen'));
@@ -42,9 +43,11 @@ const AppRoutes: React.FC = () => {
 const App: React.FC = () => {
   return (
     <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <QueryProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </QueryProvider>
     </Router>
   );
 };

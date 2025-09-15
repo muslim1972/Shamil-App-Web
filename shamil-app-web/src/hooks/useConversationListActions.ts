@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { supabase } from '../services/supabase';
+import toast from 'react-hot-toast';
 
 export const useConversationListActions = (setConversations: React.Dispatch<React.SetStateAction<any[]>>, fetchConversations: () => Promise<void>) => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -14,7 +15,7 @@ export const useConversationListActions = (setConversations: React.Dispatch<Reac
     try {
       const { error } = await operation();
       if (error) {
-        alert('خطأ: ' + errorMessage);
+        toast.error('خطأ: ' + errorMessage);
         console.error(errorMessage, error);
       } else {
         // تحديث الواجهة فوراً بدلاً من انتظار إعادة الجلب
@@ -26,7 +27,7 @@ export const useConversationListActions = (setConversations: React.Dispatch<Reac
         }
       }
     } catch (err: any) {
-      alert('خطأ: ' + errorMessage);
+      toast.error('خطأ: ' + errorMessage);
       console.error(errorMessage, err);
     } finally {
       setIsProcessing(false);
@@ -68,7 +69,7 @@ export const useConversationListActions = (setConversations: React.Dispatch<Reac
   const handleDeleteConversationForAll = useCallback(() => {
     if (!selectedConversation) return;
 
-    if (confirm("هل أنت متأكد؟ سيتم حذف هذه المحادثة وكل رسائلها بشكل نهائي لك وللجميع.")) {
+    if (window.confirm("هل أنت متأكد؟ سيتم حذف هذه المحادثة وكل رسائلها بشكل نهائي لك وللجميع.")) {
       handleDbOperation(
         async () => {
           const { error } = await supabase.rpc('delete_conversation_for_all', { p_conversation_id: selectedConversation.id });
