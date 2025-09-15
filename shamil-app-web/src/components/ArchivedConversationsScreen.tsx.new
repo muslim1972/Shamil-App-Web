@@ -71,14 +71,6 @@ const ArchivedConversationsScreen: React.FC = () => {
     longPressTriggered.current = false;
   }, []);
 
-  // استخدام دوال إجراءات المحادثات المؤرشفة
-  const {
-    handleConversationOptions,
-    handleUnarchiveConversation,
-    handleHideConversation,
-    handleDeleteConversationForAll
-  } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
-
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target) return;
 
@@ -102,12 +94,9 @@ const ArchivedConversationsScreen: React.FC = () => {
       y: rect.bottom,
       conversation
     });
+  }, [archivedConversations]);
 
-    // Use the action hook to select the conversation
-    handleConversationOptions(conversation);
-  }, [archivedConversations, handleConversationOptions]);
-
-  const longPressEvents = useLongPress(handleLongPress, { delay: 500 });
+  const longPressEvents = useLongPress(handleLongPress, 500);
 
   // Handle click events to prevent navigation after long press
   const handleItemClick = useCallback((conversationId: string) => {
@@ -121,6 +110,14 @@ const ArchivedConversationsScreen: React.FC = () => {
   const handleBack = () => {
     navigate('/conversations');
   };
+
+  // استخدام دوال إجراءات المحادثات المؤرشفة
+  const {
+    handleConversationOptions,
+    handleUnarchiveConversation,
+    handleHideConversation,
+    handleDeleteConversationForAll
+  } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
 
   const handleLogout = async () => {
     try {
