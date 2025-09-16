@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileIcon, Download, MapPin } from 'lucide-react';
+import { FileIcon, Download, MapPin, CheckSquare } from 'lucide-react';
 import { AudioPlayer } from '../AudioPlayer';
 import type { Message } from '../../types';
 import { isLocationMessage, extractLocationFromMessage, extractMapUrlFromMessage } from '../../utils/messageHelpers';
@@ -10,9 +10,12 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   onLongPress: (target: EventTarget | null, message: Message) => void;
+  isSelected?: boolean;
+  onClick?: () => void;
+  messageId?: string;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress, isSelected, onClick, messageId }) => {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -65,11 +68,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
     <div 
       {...longPressEvents}
       data-id={message.id}
-      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+      data-message-id={messageId}
+      onClick={onClick}
+      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg relative message-bubble ${
       isOwnMessage
-        ? 'bg-indigo-500 text-white'
-        : 'bg-white text-gray-800 shadow-sm'
-    }`}>
+        ? 'bg-indigo-400 bg-opacity-90 text-white'
+        : 'bg-white bg-opacity-90 text-gray-800 shadow-sm'
+    } ${isSelected ? 'ring-2 ring-green-500' : ''}`}>
+      {isSelected && (
+        <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1">
+          <CheckSquare size={16} className="text-white" />
+        </div>
+      )}
       {renderMessageContent()}
       <div
         className={`text-xs mt-1 text-right w-full ${

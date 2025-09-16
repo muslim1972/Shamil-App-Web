@@ -12,11 +12,9 @@ const useLongPress = (
 
   const start = useCallback(
     (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
-      console.log("start");
       // We store the event target, as the event object itself will be reused by React
       targetRef.current = event.currentTarget;
       timeout.current = setTimeout(() => {
-        console.log("long press triggered");
         onLongPress(targetRef.current);
       }, delay);
     },
@@ -24,7 +22,6 @@ const useLongPress = (
   );
 
   const clear = useCallback(() => {
-    console.log("clear");
     timeout.current && clearTimeout(timeout.current);
   }, []);
 

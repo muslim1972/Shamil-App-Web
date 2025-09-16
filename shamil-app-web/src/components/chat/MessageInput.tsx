@@ -1,7 +1,7 @@
-// MessageInput Component
-// This component handles the message input field and related buttons
+// MessageInput Component - Optimized Version
+// This component handles the message input field and related buttons with improved focus handling
 
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Paperclip, Send, Mic, CornerDownLeft } from 'lucide-react';
 
 interface MessageInputProps {
@@ -14,17 +14,24 @@ interface MessageInputProps {
   isRecording: boolean;
   inputRef: React.RefObject<HTMLTextAreaElement>;
   disabled?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  isFocused?: boolean;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   newMessage,
   setNewMessage,
+  onSendMessage,
   onAttachmentClick,
   onStartRecording,
   isUploading,
   isRecording,
   inputRef,
-  disabled = false
+  disabled = false,
+  onFocus,
+  onBlur,
+  isFocused = false
 }) => {
   // حساب عدد الأحرف المتبقية
   const maxCharacters = 1000;
@@ -33,15 +40,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // التحقق مما إذا كان النص طويلاً جداً
   const isTextTooLong = remainingCharacters < 0;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  // معالج تغيير محتوى حقل الإدخال
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     // تحديد طول النص إلى الحد الأقصى
     if (text.length <= maxCharacters) {
       setNewMessage(text);
     }
-  };
+  }, [setNewMessage]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  // معالج ضغط المفاتيح
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // إرسال الرسالة عند الضغط على Enter بدون Shift
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -49,7 +58,43 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         onSendMessage(e as any);
       }
     }
-  };
+  }, [disabled, onSendMessage]);
+
+  // معالج إضافة سطر جديد
+  const handleAddNewLine = useCallback(() => {
+    if (inputRef.current) {
+      const currentValue = newMessage;
+      setNewMessage(currentValue + '\n');
+      // التركيز على حقل الإدخال بعد إضافة السطر الجديد
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.selectionStart = inputRef.current.value.length;
+        }
+      });
+    }
+  }, [inputRef, newMessage, setNewMessage]);
+
+  // معالج التركيز على حقل الإدخال
+  const handleFocus = useCallback(() => {
+    if (onFocus) {
+      onFocus();
+    }
+  }, [onFocus]);
+
+  // معالج فقدان التركيز من حقل الإدخال
+  const handleBlur = useCallback(() => {
+    if (onBlur) {
+      onBlur();
+    }
+  }, [onBlur]);
+
+  // التأكد من بقاء التركيز على حقل الإدخال عند الحاجة
+  useEffect(() => {
+    if (isFocused && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isFocused, inputRef]);
 
   return (
     <div className="flex flex-col px-2">
@@ -74,6 +119,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={newMessage}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             placeholder="اكتب رسالة..."
             rows={1}
             className={`w-full border rounded-2xl py-2 px-4 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${
@@ -83,16 +130,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             disabled={disabled}
             style={{ maxHeight: '120px' }}
-            onFocus={(e) => {
-              // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز
-              e.preventDefault();
-              // التركيز على حقل الإدخال
-              if (inputRef.current) {
-                inputRef.current.focus();
-              }
-              // منع إخفاء لوحة المفاتيح
-              e.stopPropagation();
-            }}
+            // تحسين التركيز التلقائي
+            autoFocus={!isRecording}
           />
 
           {/* مؤشر عدد الأحرف */}
@@ -109,19 +148,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           <div className="flex space-x-1">
             <button
               type="button"
-              onClick={() => {
-                if (inputRef.current) {
-                  const currentValue = newMessage;
-                  setNewMessage(currentValue + '\n');
-                  // التركيز على حقل الإدخال بعد إضافة السطر الجديد
-                  setTimeout(() => {
-                    if (inputRef.current) {
-                      inputRef.current.focus();
-                      inputRef.current.selectionStart = inputRef.current.value.length;
-                    }
-                  }, 0);
-                }
-              }}
+              onClick={handleAddNewLine}
               disabled={disabled || isTextTooLong || isRecording}
               className={`rounded-full p-2 flex-shrink-0 transition-all ${
                 disabled || isTextTooLong || isRecording

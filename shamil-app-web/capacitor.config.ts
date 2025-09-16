@@ -12,7 +12,9 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   android: {
-    allowMixedContent: true
+    allowMixedContent: true,
+    // إضافة هذه الخاصية للتحكم في سلوك لوحة المفاتيح
+    softInputMode: 'adjustResize'
   }
 };
 
