@@ -19,6 +19,7 @@ interface MessageInputProps {
 export const MessageInput: React.FC<MessageInputProps> = ({
   newMessage,
   setNewMessage,
+  onSendMessage,
   onAttachmentClick,
   onStartRecording,
   isUploading,
@@ -83,16 +84,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
             disabled={disabled}
             style={{ maxHeight: '120px' }}
-            onFocus={(e) => {
-              // منع السلوك الافتراضي الذي قد يسبب فقدان التركيز
-              e.preventDefault();
-              // التركيز على حقل الإدخال
-              if (inputRef.current) {
-                inputRef.current.focus();
-              }
-              // منع إخفاء لوحة المفاتيح
-              e.stopPropagation();
-            }}
           />
 
           {/* مؤشر عدد الأحرف */}
@@ -135,6 +126,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <button
               type="submit"
               disabled={disabled || isTextTooLong || isRecording}
+              onClick={(e) => { if (!disabled && !isTextTooLong && !isRecording) onSendMessage && onSendMessage(e as any); }}
               className={`rounded-full p-3 flex-shrink-0 transition-all ${
                 disabled || isTextTooLong || isRecording
                   ? 'bg-gray-400 cursor-not-allowed'

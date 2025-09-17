@@ -130,7 +130,7 @@ const ChatScreen: React.FC = () => {
       
       <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100" id="messages-container">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col justify-end" id="messages-container">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">

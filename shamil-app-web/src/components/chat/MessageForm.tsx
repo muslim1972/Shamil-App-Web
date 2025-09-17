@@ -41,20 +41,6 @@ export const MessageForm: React.FC<MessageFormProps> = ({
 }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // التركيز على حقل الإدخال عند فتح المحادثة وعند إرسال الرسالة
-  useEffect(() => {
-    if (inputRef.current && !isRecording && !isUploading) {
-      inputRef.current.focus();
-    }
-  }, [isRecording, isUploading]);
-
-  // التركيز على حقل الإدخال بعد تغيير النص
-  useEffect(() => {
-    if (inputRef.current && !isRecording && !isUploading) {
-      inputRef.current.focus();
-    }
-  }, [newMessage]);
-
   // ضبط ارتفاع textarea تلقائيًا بناءً على محتواه
   useEffect(() => {
     if (inputRef.current) {

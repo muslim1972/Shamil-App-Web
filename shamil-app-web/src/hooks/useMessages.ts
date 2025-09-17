@@ -138,7 +138,11 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
             signedUrl,
           };
 
-          setMessages((currentMessages) => [...currentMessages, formattedNewMessage]);
+            setMessages((currentMessages) => {
+              // avoid duplicates if message already exists
+              if (currentMessages.some(m => m.id === formattedNewMessage.id)) return currentMessages;
+              return [...currentMessages, formattedNewMessage];
+            });
         }
       )
       .subscribe();
@@ -164,7 +168,13 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
   }, [messages]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    try {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      });
+    } catch (e) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const sendMessage = useCallback(
@@ -184,27 +194,36 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
         // Optimistically update the UI
         if (data && data.length > 0) {
           const newMessage = data[0];
-          const tempMessageId = `temp-${Date.now()}`;
+          // generate a stronger temporary id to avoid collisions
+          const tempMessageId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `temp-${Date.now()}-${Math.floor(Math.random()*100000)}`;
 
-          // إضافة رسالة مؤقتة أثناء الإرسال
-          setMessages((currentMessages) => [
-            ...currentMessages,
-            {
-              id: tempMessageId,
-              conversationId: newMessage.conversation_id,
-              text: newMessage.content,
-              senderId: newMessage.sender_id,
-              timestamp: new Date().toISOString(),
-              message_type: 'text' as const,
-              signedUrl: null,
-            },
-          ]);
+          // add temp message if not already present
+          setMessages((currentMessages) => {
+            const exists = currentMessages.some(m => m.id === newMessage.id || m.id === tempMessageId);
+            if (exists) return currentMessages;
+            return [
+              ...currentMessages,
+              {
+                id: tempMessageId,
+                conversationId: newMessage.conversation_id,
+                text: newMessage.content,
+                senderId: newMessage.sender_id,
+                timestamp: new Date().toISOString(),
+                message_type: 'text' as const,
+                signedUrl: null,
+              },
+            ];
+          });
 
-          // بعد استلام الرسالة من الخادم، استبدال الرسالة المؤقتة بالرسالة الفعلية
+          // replace temp with real message when available
           setTimeout(() => {
-            setMessages((currentMessages) => 
-              currentMessages.map(msg => 
-                msg.id === tempMessageId 
+            setMessages((currentMessages) => {
+              // if real message already exists, remove any temp duplicates
+              if (currentMessages.some(m => m.id === newMessage.id)) {
+                return currentMessages.filter(m => m.id !== tempMessageId);
+              }
+              return currentMessages.map(msg =>
+                msg.id === tempMessageId
                   ? {
                       id: newMessage.id,
                       conversationId: newMessage.conversation_id,
@@ -215,8 +234,8 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
                       signedUrl: null,
                     }
                   : msg
-              )
-            );
+              );
+            });
           }, 1000);
         }
 
