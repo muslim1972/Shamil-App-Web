@@ -9,6 +9,54 @@ import { useArchivedConversationListActions } from '../hooks/useArchivedConversa
 import { Archive, Trash2 } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import useLongPress from '../hooks/useLongPress';
+import { useGlobalUIStore } from '../stores/useGlobalUIStore'; // Added
+
+const ArchivedConversationItem: React.FC<{ conversation: Conversation; isSelected: boolean; onClick: (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => void; onLongPress: (target: EventTarget | null) => void; }> = React.memo(({ conversation, isSelected, onClick, onLongPress }) => {
+  const formattedTimestamp = useMemo(() => {
+    if (!conversation.timestamp) return '';
+    try {
+      return formatDistanceToNow(new Date(conversation.timestamp), { addSuffix: true, locale: ar });
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return '';
+    }
+  }, [conversation.timestamp]);
+
+  const longPressEvents = useLongPress((target) => onLongPress(target), onClick, { delay: 500 });
+
+  return (
+    <div
+      className={`p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700 ${isSelected ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
+      data-id={conversation.id}
+      {...longPressEvents}
+    >
+      <div className="flex items-center space-x-4 rtl:space-x-reverse pointer-events-none">
+        <div className="flex-shrink-0">
+          <div className="relative inline-flex items-center justify-center w-12 h-12 overflow-hidden bg-slate-200 dark:bg-slate-600 rounded-full">
+            <span className="font-medium text-slate-600 dark:text-slate-300 uppercase">
+              {(conversation.name || '#').charAt(0)}
+            </span>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center mb-1">
+            <p className={`text-sm font-semibold truncate ${conversation.unread ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-50'}`}>
+              {conversation.name || 'مستخدم غير معروف'}
+            </p>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {formattedTimestamp}
+            </span>
+          </div>
+          <p className={`text-sm truncate ${conversation.unread ? 'text-slate-700 dark:text-slate-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
+            {conversation.lastMessage || 'لا توجد رسائل بعد'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+ArchivedConversationItem.displayName = 'ArchivedConversationItem';
 
 const ArchivedConversationsScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +65,20 @@ const ArchivedConversationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
+
+  // Global UI Store
+  const {
+    selectionMode,
+    selectedItems,
+    setSelectionMode,
+    clearSelection,
+    toggleSelectedItem,
+    lastTriggeredAction,
+    clearLastTriggeredAction,
+  } = useGlobalUIStore();
+
+  const isArchivedSelectionMode = selectionMode === 'conversations'; // Re-use 'conversations' selection mode
+  const selectedArchivedConversations = selectedItems as Conversation[];
 
   const fetchArchivedConversations = useCallback(async () => {
     if (!user) {
@@ -64,7 +126,7 @@ const ArchivedConversationsScreen: React.FC = () => {
     setMenu(null);
   }, []);
 
-  const { handleConversationOptions, handleUnarchiveConversation, handleHideConversation, handleDeleteConversationForAll } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
+  const { handleUnarchiveConversation, handleHideConversation, handleDeleteConversationForAll, handleConversationOptions } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target) return;
@@ -79,65 +141,87 @@ const ArchivedConversationsScreen: React.FC = () => {
     const conversation = archivedConversations.find(c => c.id === conversationId);
     if (!conversation) return;
 
-    const rect = conversationElement.getBoundingClientRect();
-    setMenu({ x: rect.left, y: rect.bottom, conversation });
+    // Toggle selection
+    toggleSelectedItem(conversation, 'conversation');
+    if (!isArchivedSelectionMode) {
+      setSelectionMode('conversations');
+    }
 
-    handleConversationOptions(conversation);
-  }, [archivedConversations, handleConversationOptions]);
+    // Keep the menu functionality for single long press if not in selection mode
+    if (!isArchivedSelectionMode) {
+      const rect = conversationElement.getBoundingClientRect();
+      setMenu({ x: rect.left, y: rect.bottom, conversation });
+      handleConversationOptions(conversation); // Set selectedConversation in hook
+    }
+  }, [archivedConversations, toggleSelectedItem, isArchivedSelectionMode, setSelectionMode, handleConversationOptions]);
 
   const handleConversationClick = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     const conversationElement = (event.currentTarget as HTMLElement).closest('[data-id]');
     if (!conversationElement) return;
     const conversationId = conversationElement.getAttribute('data-id');
     if (conversationId) {
+      if (isArchivedSelectionMode) {
+        const conversation = archivedConversations.find(c => c.id === conversationId);
+        if (conversation) {
+          toggleSelectedItem(conversation, 'conversation');
+        }
+      } else {
         handleSelectConversation(conversationId);
+      }
     }
   };
 
-  const longPressEvents = useLongPress(handleLongPress, handleConversationClick, { delay: 500 });
+  // Handlers for global footer actions
+  const handleUnarchiveSelected = useCallback(async () => {
+    for (const conv of selectedArchivedConversations) {
+      const { error } = await supabase.rpc('unarchive_conversation', { p_conversation_id: conv.id });
+      if (error) {
+        console.error('Error unarchiving conversation:', error);
+      }
+    }
+    clearSelection();
+    fetchArchivedConversations(); // Re-fetch after actions
+  }, [selectedArchivedConversations, clearSelection, fetchArchivedConversations]);
+
+  const handleDeleteSelectedForMe = useCallback(async () => {
+    for (const conv of selectedArchivedConversations) {
+      const { error } = await supabase.rpc('clear_and_hide_conversation', { p_conversation_id: conv.id });
+      if (error) {
+        console.error('Error hiding conversation:', error);
+      }
+    }
+    clearSelection();
+    fetchArchivedConversations(); // Re-fetch after actions
+  }, [selectedArchivedConversations, clearSelection, fetchArchivedConversations]);
+
+  // const handleDeleteSelectedForAll = useCallback(async () => {
+  //   for (const conv of selectedArchivedConversations) {
+  //     const { error } = await supabase.rpc('delete_conversation_for_all', { p_conversation_id: conv.id });
+  //     if (error) {
+  //       console.error('Error deleting conversation for all:', error);
+  //     }
+  //   }
+  //   clearSelection();
+  //   fetchArchivedConversations(); // Re-fetch after actions
+  // }, [selectedArchivedConversations, clearSelection, fetchArchivedConversations]);
+
 
   const handleBack = () => {
     navigate('/conversations');
   };
 
-  const ArchivedConversationItem: React.FC<{ conversation: Conversation; }> = React.memo(({ conversation }) => {
-    const formattedTimestamp = useMemo(() => {
-      if (!conversation.timestamp) return '';
-      try {
-        return formatDistanceToNow(new Date(conversation.timestamp), { addSuffix: true, locale: ar });
-      } catch (error) {
-        console.error("Error formatting date:", error);
-        return '';
+  // Listen for actions triggered by the global footer
+  useEffect(() => {
+    if (lastTriggeredAction) {
+      if (lastTriggeredAction.type === 'deleteConversation') {
+        handleDeleteSelectedForMe(); // Assuming delete from footer means "delete for me" for archived
+      } else if (lastTriggeredAction.type === 'archiveConversation') {
+        handleUnarchiveSelected(); // Assuming archive from footer means "unarchive" for archived
       }
-    }, [conversation.timestamp]);
+      clearLastTriggeredAction(); // Clear the action after it's been handled
+    }
+  }, [lastTriggeredAction, handleDeleteSelectedForMe, handleUnarchiveSelected, clearLastTriggeredAction]);
 
-    return (
-      <div className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700">
-        <div className="flex items-center space-x-4 rtl:space-x-reverse pointer-events-none">
-          <div className="flex-shrink-0">
-            <div className="relative inline-flex items-center justify-center w-12 h-12 overflow-hidden bg-slate-200 dark:bg-slate-600 rounded-full">
-              <span className="font-medium text-slate-600 dark:text-slate-300 uppercase">
-                {(conversation.name || '#').charAt(0)}
-              </span>
-            </div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex justify-between items-center mb-1">
-              <p className={`text-sm font-semibold truncate ${conversation.unread ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-50'}`}>
-                {conversation.name || 'مستخدم غير معروف'}
-              </p>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {formattedTimestamp}
-              </span>
-            </div>
-            <p className={`text-sm truncate ${conversation.unread ? 'text-slate-700 dark:text-slate-300 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
-              {conversation.lastMessage || 'لا توجد رسائل بعد'}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  });
 
   if (loading) {
     return (
@@ -194,8 +278,13 @@ const ArchivedConversationsScreen: React.FC = () => {
         ) : (
           <ul>
             {archivedConversations.map((conversation) => (
-              <li key={conversation.id} data-id={conversation.id} {...longPressEvents}>
-                <ArchivedConversationItem conversation={conversation} />
+              <li key={conversation.id} data-id={conversation.id}>
+                <ArchivedConversationItem
+                  conversation={conversation}
+                  isSelected={selectedArchivedConversations.some(c => c.id === conversation.id)}
+                  onClick={handleConversationClick}
+                  onLongPress={handleLongPress}
+                />
               </li>
             ))}
           </ul>
@@ -209,10 +298,10 @@ const ArchivedConversationsScreen: React.FC = () => {
         <Menu as="div" className="fixed z-30" style={{ top: menu?.y, left: menu?.x }}>
           <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="py-1">
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleUnarchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />إلغاء أرشفة المحادثة</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleConversationOptions(menu?.conversation); handleUnarchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />إلغاء أرشفة المحادثة</button>)}</Menu.Item>
               <div className="px-4 my-1"><hr className="border-slate-200"/></div>
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي فقط</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleConversationOptions(menu?.conversation); handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي فقط</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleConversationOptions(menu?.conversation); handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
             </div>
           </Menu.Items>
         </Menu>

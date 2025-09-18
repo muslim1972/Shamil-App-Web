@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useForwarding } from '../context/ForwardingContext';
@@ -8,13 +8,15 @@ import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LogOut, MessageSquarePlus, Archive, Trash2, Ban, QrCode, Image, Camera, X } from 'lucide-react';
-import { Menu, Transition } from '@headlessui/react';
+import { LogOut, MessageSquarePlus, Archive, QrCode, Image, Camera, X } from 'lucide-react';
+
 import SearchDialog from './SearchDialog';
+// import { AppFooter } from './common/AppFooter'; // Removed
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
+import { useGlobalUIStore } from '../stores/useGlobalUIStore'; // Added
 
-const ConversationItem: React.FC<{ conversation: Conversation; }> = React.memo(({ conversation }) => {
+const ConversationItem: React.FC<{ conversation: Conversation; isSelected: boolean; onClick: (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => void; onLongPress: (target: EventTarget | null) => void; }> = React.memo(({ conversation, isSelected, onClick, onLongPress }) => {
   const formattedTimestamp = useMemo(() => {
     if (!conversation.timestamp) return '';
     try {
@@ -25,9 +27,15 @@ const ConversationItem: React.FC<{ conversation: Conversation; }> = React.memo((
     }
   }, [conversation.timestamp]);
 
+  const longPressEvents = useLongPress((target) => onLongPress(target), onClick, { delay: 500 });
+
   return (
-    <div className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700">
-      <div className="flex items-center space-x-4 rtl:space-x-reverse pointer-events-none">
+    <div
+      className={`p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700 ${isSelected ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
+      data-id={conversation.id}
+      {...longPressEvents}
+    >
+      <div className="flex items-center space-x-4 rtl:space-x-reverse">
         <div className="flex-shrink-0">
           <div className="relative inline-flex items-center justify-center w-12 h-12 overflow-hidden bg-slate-200 dark:bg-slate-600 rounded-full">
             <span className="font-medium text-slate-600 dark:text-slate-300 uppercase">
@@ -64,10 +72,22 @@ const ConversationListScreen: React.FC = () => {
   const { isForwarding, messagesToForward, completeForwarding } = useForwarding();
   const { conversations, loading, error, fetchConversations, setConversations } = useConversations();
 
-  const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
+  // Global UI Store
+  const {
+    selectionMode,
+    selectedItems,
+    setSelectionMode,
+    // clearSelection, // Removed
+    toggleSelectedItem,
+    lastTriggeredAction,
+  } = useGlobalUIStore();
+
+  const isConversationsSelectionMode = selectionMode === 'conversations';
+  const selectedConversations = selectedItems as Conversation[];
+
   const [showQRMenu, setShowQRMenu] = useState(false);
 
-  const { handleConversationOptions, handleArchiveConversation, handleHideConversation, handleDeleteConversationForAll, closeActionMenu } = useConversationListActions(setConversations, fetchConversations);
+  const {} = useConversationListActions(setConversations, fetchConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target || isForwarding) return; // Disable long press in forwarding mode
@@ -78,12 +98,12 @@ const ConversationListScreen: React.FC = () => {
 
     if (!conversation) return;
 
-    handleConversationOptions(conversation);
+    toggleSelectedItem(conversation, 'conversation');
+    if (!isConversationsSelectionMode) {
+      setSelectionMode('conversations');
+    }
 
-    const rect = targetElement.getBoundingClientRect();
-    setMenu({ x: rect.left, y: rect.bottom, conversation });
-
-  }, [conversations, handleConversationOptions, isForwarding]);
+  }, [conversations, isConversationsSelectionMode, toggleSelectedItem, setSelectionMode, isForwarding]);
 
   const handleSelectConversation = useCallback(async (conversationId: string) => {
     if (isForwarding && user) {
@@ -117,17 +137,57 @@ const ConversationListScreen: React.FC = () => {
   const handleConversationClick = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     const conversationElement = (event.currentTarget as HTMLElement);
     const conversationId = conversationElement.dataset.id;
+
     if (conversationId) {
+      if (isConversationsSelectionMode) {
+        const conversation = conversations.find(c => c.id === conversationId);
+        if (conversation) {
+          toggleSelectedItem(conversation, 'conversation');
+        }
+      } else {
         handleSelectConversation(conversationId);
+      }
     }
   };
 
-  const longPressEvents = useLongPress(handleLongPress, handleConversationClick, { delay: 500 });
+  // const longPressEvents = useLongPress(handleLongPress, handleConversationClick, { delay: 500 }); // Moved to ConversationItem
 
-  const handleCloseMenu = () => {
-    setMenu(null);
-    closeActionMenu();
-  };
+  const clearConversationsSelection = useGlobalUIStore((state) => state.clearSelection);
+
+  const handleDeleteConversations = useCallback(async () => {
+    if (selectedConversations.length === 0) return;
+
+    // For simplicity, we'll just hide conversations for the user
+    for (const conversation of selectedConversations) {
+      const { error } = await supabase.rpc('clear_and_hide_conversation', { p_conversation_id: conversation.id });
+      if (error) {
+        toast.error('لم نتمكن من حذف المحادثة لديك.');
+        console.error('Error hiding conversation:', error);
+      }
+    }
+
+    // Refresh conversations list
+    await fetchConversations();
+    clearConversationsSelection();
+  }, [selectedConversations, fetchConversations, clearConversationsSelection]);
+
+  const handleArchiveConversations = useCallback(async () => {
+    if (selectedConversations.length === 0) return;
+
+    // Archive conversations
+    for (const conversation of selectedConversations) {
+      const { error } = await supabase.rpc('archive_conversation', { p_conversation_id: conversation.id });
+      if (error) {
+        toast.error('لم نتمكن من أرشفة المحادثة.');
+        console.error('Error archiving conversation:', error);
+      }
+    }
+
+    // Refresh conversations list
+    await fetchConversations();
+    clearConversationsSelection();
+  }, [selectedConversations, fetchConversations, clearConversationsSelection]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -181,6 +241,17 @@ const ConversationListScreen: React.FC = () => {
 
   const handleCreateNewConversation = useCallback(() => { navigate('/users'); }, [navigate]);
   const handleLogout = useCallback(async () => { /* ... */ }, [signOut, navigate]);
+
+  // Listen for actions triggered by the global footer
+  useEffect(() => {
+    if (lastTriggeredAction) {
+      if (lastTriggeredAction.type === 'deleteConversation') {
+        handleDeleteConversations();
+      } else if (lastTriggeredAction.type === 'archiveConversation') {
+        handleArchiveConversations();
+      }
+    }
+  }, [lastTriggeredAction, handleDeleteConversations, handleArchiveConversations]);
 
   if (loading) { return <div>Loading...</div>; }
   if (error) { return <div>Error...</div>; }
@@ -273,31 +344,31 @@ const ConversationListScreen: React.FC = () => {
         <div className="flex-1 overflow-y-auto">
           <ul>
             {conversations.map((conversation) => (
-              <li key={conversation.id} data-id={conversation.id} {...longPressEvents}>
-                <ConversationItem conversation={conversation} />
+              <li key={conversation.id}>
+                <ConversationItem
+                  conversation={conversation}
+                  isSelected={selectedConversations.some(c => c.id === conversation.id)}
+                  onClick={handleConversationClick}
+                  onLongPress={handleLongPress}
+                />
               </li>
             ))}
           </ul>
         </div>
       </main>
 
-      <Transition as={Fragment} show={!!menu}>
-        {/* ... Menu backdrop ... */}
-      </Transition>
-      <Transition as={Fragment} show={!!menu}>
-        <Menu as="div" className="fixed z-30" style={{ top: menu?.y, left: menu?.x }}>
-          <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
-            <div className="py-1">
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleArchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />أرشفة المحادثة</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => { handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Ban className="mr-3 h-5 w-5" />حظر المستخدم</button>)}</Menu.Item>
-            </div>
-          </Menu.Items>
-        </Menu>
-      </Transition>
 
-
+      {/* <AppFooter // Removed
+        isConversationsSelectionMode={isConversationsSelectionMode}
+        selectedConversationsCount={selectedConversations.length}
+        onDeleteConversationClick={handleDeleteConversations}
+        onArchiveConversationClick={handleArchiveConversations}
+        canArchive={selectedConversations.length > 0}
+        activeScreen="conversations"
+        onMessagesClick={() => {}}
+        onProfileClick={() => {}}
+        onSettingsClick={() => {}}
+      /> */}
     </div>
   );
 };

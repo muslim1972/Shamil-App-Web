@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AppFooter } from './common/AppFooter';
 
 interface Conversation {
   id: string;
@@ -114,6 +115,9 @@ const ConversationsScreen: React.FC<ConversationsScreenProps> = ({
           </ul>
         )}
       </div>
+      
+      {/* App Footer */}
+      <AppFooter />
     </div>
   );
 };

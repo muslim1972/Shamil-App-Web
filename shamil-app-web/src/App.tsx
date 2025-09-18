@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ForwardingProvider } from './context/ForwardingContext';
 import { QueryProvider } from './providers/QueryProvider';
+import { MainLayout } from './components/layout/MainLayout'; // Import MainLayout
 
 const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
 const ConversationListScreen = React.lazy(() => import('./components/ConversationListScreen'));
@@ -47,7 +48,9 @@ const App: React.FC = () => {
       <QueryProvider>
         <AuthProvider>
           <ForwardingProvider>
-            <AppRoutes />
+            <MainLayout> {/* Wrap AppRoutes with MainLayout */}
+              <AppRoutes />
+            </MainLayout>
           </ForwardingProvider>
         </AuthProvider>
       </QueryProvider>

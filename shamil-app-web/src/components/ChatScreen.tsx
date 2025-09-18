@@ -8,11 +8,13 @@ import { useLocation } from '../hooks/useLocation';
 import { ChatHeader } from './chat/ChatHeader';
 import { MessageList } from './chat/MessageList';
 import { MessageForm } from './chat/MessageForm';
+// import { AppFooter } from './common/AppFooter'; // Removed
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from '../services/supabase';
+import { useGlobalUIStore } from '../stores/useGlobalUIStore'; // Added
 
-import { Pin, Trash2, Forward, X } from 'lucide-react';
+import { Pin, X } from 'lucide-react';
 import type { Message } from '../types';
 
 const ChatScreen: React.FC = () => {
@@ -21,17 +23,27 @@ const ChatScreen: React.FC = () => {
   const { user } = useAuth();
   const { startForwarding } = useForwarding();
 
+  // Global UI Store
+  const {
+    selectionMode,
+    selectedItems,
+    setSelectionMode,
+    clearSelection,
+    toggleSelectedItem,
+    lastTriggeredAction,
+  } = useGlobalUIStore();
+
+  const isSelectionMode = selectionMode === 'messages';
+  const selectedMessages = selectedItems as Message[];
+
   // State
   const [newMessage, setNewMessage] = useState('');
   const [isAttachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  const [selectedMessages, setSelectedMessages] = useState<Message[]>([]);
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [deleteMenu, setDeleteMenu] = useState<{ x: number; y: number } | null>(null);
   const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
-  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Custom hooks
@@ -42,37 +54,16 @@ const ChatScreen: React.FC = () => {
   const handleMessageClick = (message: Message, e?: React.MouseEvent | React.TouchEvent) => {
     if (!isSelectionMode) return;
     if (e) e.stopPropagation();
-
-    const isSelected = selectedMessages.some(m => m.id === message.id);
-    if (isSelected) {
-      const newSelectedMessages = selectedMessages.filter(m => m.id !== message.id);
-      setSelectedMessages(newSelectedMessages);
-      if (newSelectedMessages.length === 0) {
-        setIsSelectionMode(false);
-      }
-    } else {
-      setSelectedMessages([...selectedMessages, message]);
-    }
+    toggleSelectedItem(message, 'message');
   };
 
   const handleMessageLongPress = useCallback((target: EventTarget | null, message: Message) => {
     if (!target) return;
+    toggleSelectedItem(message, 'message');
     if (!isSelectionMode) {
-      setIsSelectionMode(true);
-      setSelectedMessages([message]);
-    } else {
-      const isSelected = selectedMessages.some(m => m.id === message.id);
-      if (isSelected) {
-        const newSelectedMessages = selectedMessages.filter(m => m.id !== message.id);
-        setSelectedMessages(newSelectedMessages);
-        if (newSelectedMessages.length === 0) {
-          setIsSelectionMode(false);
-        }
-      } else {
-        setSelectedMessages([...selectedMessages, message]);
-      }
+      setSelectionMode('messages');
     }
-  }, [isSelectionMode, selectedMessages]);
+  }, [isSelectionMode, toggleSelectedItem, setSelectionMode]);
 
   const displayConversationName = conversationDetails?.name || 'محادثة';
 
@@ -111,44 +102,30 @@ const ChatScreen: React.FC = () => {
     } catch (error) {
       console.error('فشل في إرسال الرسالة الصوتية:', error);
       toast.error('فشل في إرسال الرسالة الصوتية، حاول مرة أخرى');
-    } finally {
+    }
+    finally {
       setIsSending(false);
     }
     return success;
   };
 
-  const clearSelection = () => {
-    setSelectedMessages([]);
-    setIsSelectionMode(false);
-    setDeleteMenu(null);
-  };
+  // const clearSelection = () => { // Removed, using global clearSelection
+  //   setSelectedMessages([]);
+  //   setIsSelectionMode(false);
+  // };
 
   const handleContainerClick = (e: React.MouseEvent | React.TouchEvent) => {
     if (isSelectionMode && !(e.target as HTMLElement).closest('[data-id]')) {
       clearSelection();
     }
-    if (deleteMenu && !(e.target as HTMLElement).closest('#delete-menu-container')) {
-        setDeleteMenu(null);
-    }
   };
 
-  const handleToggleDeleteMenu = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (deleteMenu) {
-      setDeleteMenu(null);
-      return;
-    }
-    if (deleteButtonRef.current) {
-      const rect = deleteButtonRef.current.getBoundingClientRect();
-      setDeleteMenu({ x: rect.left, y: rect.top - 10 });
-    }
-  };
-
-  const handleForwardMessages = () => {
+  const handleForwardMessages = useCallback(() => {
     if (selectedMessages.length === 0) return;
     startForwarding(selectedMessages);
     navigate('/conversations');
-  };
+    clearSelection();
+  }, [selectedMessages, startForwarding, navigate, clearSelection]);
 
   const canDeleteForAll = useMemo(() => {
     if (!user || selectedMessages.length === 0) return false;
@@ -160,13 +137,13 @@ const ChatScreen: React.FC = () => {
     return selectedMessages[0].senderId === user.id;
   }, [selectedMessages, user]);
 
-  const handlePinMessage = () => {
+  const handlePinMessage = useCallback(() => {
     if (!canPin) return;
     setPinnedMessage(selectedMessages[0]);
     clearSelection();
-  };
+  }, [canPin, selectedMessages, clearSelection]);
 
-  const handleDeleteForMe = async () => {
+  const handleDeleteForMe = useCallback(async () => {
     const messageIds = selectedMessages.map(m => m.id);
     const { error } = await supabase.rpc('hide_messages_for_user', { p_message_ids: messageIds });
     if (error) {
@@ -176,9 +153,9 @@ const ChatScreen: React.FC = () => {
       removeMessagesByIds(messageIds);
     }
     clearSelection();
-  };
+  }, [selectedMessages, removeMessagesByIds, clearSelection]);
 
-  const handleDeleteForEveryone = async () => {
+  const handleDeleteForEveryone = useCallback(async () => {
     if (!canDeleteForAll) return;
     const messageIds = selectedMessages.map(m => m.id);
     const { error } = await supabase.rpc('delete_messages_for_all', { p_message_ids: messageIds });
@@ -189,7 +166,22 @@ const ChatScreen: React.FC = () => {
       removeMessagesByIds(messageIds);
     }
     clearSelection();
-  };
+  }, [canDeleteForAll, selectedMessages, removeMessagesByIds, clearSelection]);
+
+  // Listen for actions triggered by the global footer
+  useEffect(() => {
+    if (lastTriggeredAction) {
+      if (lastTriggeredAction.type === 'deleteForMe') {
+        handleDeleteForMe();
+      } else if (lastTriggeredAction.type === 'deleteForAll') {
+        handleDeleteForEveryone();
+      } else if (lastTriggeredAction.type === 'pin') {
+        handlePinMessage();
+      } else if (lastTriggeredAction.type === 'forward') {
+        handleForwardMessages();
+      }
+    }
+  }, [lastTriggeredAction, handleDeleteForMe, handleDeleteForEveryone, handlePinMessage, handleForwardMessages]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50" onClick={handleContainerClick}>
@@ -235,25 +227,17 @@ const ChatScreen: React.FC = () => {
         {isSending && <div className="text-center text-xs text-gray-500 py-1">جاري الإرسال...</div>}
         <MessageForm {...{ newMessage, setNewMessage, onSendMessage: handleSendMessage, isAttachmentMenuOpen, setAttachmentMenuOpen, onStartRecording: handleStartRecording, isUploading, isRecording, recordingDuration, handleCancelRecording, handleSendRecording: handleSendRecordingWithCaption, pickAndSendMedia, handleSendLocation, disabled: !isOnline || isSending, inputRef }} />
       </div>
-
-      <div className={`bg-white border-t border-gray-200 p-3 flex justify-between items-center ${isSelectionMode ? '' : 'invisible'}`}>
-        <div className="text-sm font-medium text-gray-700">{selectedMessages.length} رسالة محددة</div>
-        <div className="flex space-x-4">
-          <button ref={deleteButtonRef} onClick={handleToggleDeleteMenu} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Trash2 size={20} /></button>
-          <button onClick={handlePinMessage} disabled={!canPin} className="p-2 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"><Pin size={20} /></button>
-          <button onClick={handleForwardMessages} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Forward size={20} /></button>
-        </div>
-      </div>
-
-      {deleteMenu && (
-        <div id="delete-menu-container" className="absolute rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none py-1"
-             style={{ top: deleteMenu.y, left: deleteMenu.x, transform: 'translateY(-100%)' }}>
-            <button onClick={handleDeleteForMe} className="block w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">الحذف لدي</button>
-            {canDeleteForAll && (
-                <button onClick={handleDeleteForEveryone} className="block w-full text-right px-4 py-2 text-sm text-red-600 hover:bg-gray-100">الحذف لدى الجميع</button>
-            )}
-        </div>
-      )}
+      {/* <AppFooter // Removed
+        activeScreen="chat"
+        isSelectionMode={isSelectionMode}
+        selectedMessagesCount={selectedMessages.length}
+        onDeleteForMeClick={handleDeleteForMe}
+        onDeleteForAllClick={handleDeleteForEveryone}
+        onPinClick={handlePinMessage}
+        onForwardClick={handleForwardMessages}
+        canPin={canPin}
+        onHomeClick={handleBack}
+      /> */}
     </div>
   );
 };
