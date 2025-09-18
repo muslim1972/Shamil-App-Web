@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ForwardingProvider } from './context/ForwardingContext';
 import { QueryProvider } from './providers/QueryProvider';
 
 const AuthScreen = React.lazy(() => import('./components/AuthScreen'));
@@ -45,7 +46,9 @@ const App: React.FC = () => {
     <Router>
       <QueryProvider>
         <AuthProvider>
-          <AppRoutes />
+          <ForwardingProvider>
+            <AppRoutes />
+          </ForwardingProvider>
         </AuthProvider>
       </QueryProvider>
     </Router>

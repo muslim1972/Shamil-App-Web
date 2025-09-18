@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useForwarding } from '../context/ForwardingContext';
 import { useConversations } from '../hooks/useConversations';
 import { useConversationListActions } from '../hooks/useConversationListActions';
 import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LogOut, MessageSquarePlus, Archive, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
+import { LogOut, MessageSquarePlus, Archive, Trash2, Ban, QrCode, Image, Camera, X } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import SearchDialog from './SearchDialog';
 import { supabase } from '../services/supabase';
@@ -60,6 +61,7 @@ ConversationItem.displayName = 'ConversationItem';
 const ConversationListScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const { isForwarding, messagesToForward, completeForwarding } = useForwarding();
   const { conversations, loading, error, fetchConversations, setConversations } = useConversations();
 
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
@@ -68,7 +70,7 @@ const ConversationListScreen: React.FC = () => {
   const { handleConversationOptions, handleArchiveConversation, handleHideConversation, handleDeleteConversationForAll, closeActionMenu } = useConversationListActions(setConversations, fetchConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
-    if (!target) return;
+    if (!target || isForwarding) return; // Disable long press in forwarding mode
 
     const targetElement = target as HTMLElement;
     const conversationId = targetElement.dataset.id;
@@ -81,11 +83,36 @@ const ConversationListScreen: React.FC = () => {
     const rect = targetElement.getBoundingClientRect();
     setMenu({ x: rect.left, y: rect.bottom, conversation });
 
-  }, [conversations, handleConversationOptions]);
+  }, [conversations, handleConversationOptions, isForwarding]);
 
-  const handleSelectConversation = useCallback((conversationId: string) => {
+  const handleSelectConversation = useCallback(async (conversationId: string) => {
+    if (isForwarding && user) {
+        const loadingToast = toast.loading('جاري تحويل الرسائل...');
+        try {
+            const { error } = await supabase.from('messages').insert({
+                conversation_id: conversationId,
+                sender_id: user.id,
+                content: JSON.stringify(messagesToForward),
+                message_type: 'forwarded_block',
+            });
+
+            if (error) throw error;
+
+            toast.success('تم تحويل الرسائل بنجاح!');
+            completeForwarding();
+            navigate(`/chat/${conversationId}`);
+
+        } catch (err) {
+            console.error('Error forwarding messages:', err);
+            toast.error('فشل تحويل الرسائل.');
+        } finally {
+            toast.dismiss(loadingToast);
+        }
+        return; // Stop execution here
+    }
+
     navigate(`/chat/${conversationId}`);
-  }, [navigate]);
+  }, [navigate, isForwarding, user, messagesToForward, completeForwarding]);
 
   const handleConversationClick = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     const conversationElement = (event.currentTarget as HTMLElement);
@@ -161,6 +188,17 @@ const ConversationListScreen: React.FC = () => {
   return (
     <div className="h-screen bg-slate-100 dark:bg-slate-900">
       <main className="w-full h-full flex flex-col bg-white dark:bg-slate-800 shadow-2xl sm:max-w-2xl sm:mx-auto">
+
+        {isForwarding && (
+            <div className="bg-blue-100 border-b-2 border-blue-500 p-3 text-center">
+                <div className="flex justify-between items-center">
+                    <p className="font-semibold text-blue-800">اختر محادثة لتحويل الرسائل إليها</p>
+                    <button onClick={() => completeForwarding()} className="p-1 rounded-full hover:bg-blue-200">
+                        <X size={20} className="text-blue-800" />
+                    </button>
+                </div>
+            </div>
+        )}
 
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-lg p-4 shadow-sm border-b border-slate-200 dark:border-slate-700 z-10">
           <div className="flex justify-between items-center">

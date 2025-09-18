@@ -21,7 +21,7 @@ export interface Message {
   text: string;
   senderId: string;
   timestamp: string;
-  message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
+  message_type: 'text' | 'image' | 'video' | 'audio' | 'file' | 'forwarded_block';
   signedUrl: string | null;
   caption?: string | null;
   media_metadata?: { duration: number } | null;

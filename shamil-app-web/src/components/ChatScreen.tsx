@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useForwarding } from '../context/ForwardingContext';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { useRecording } from '../hooks/useRecording';
 import { useLocation } from '../hooks/useLocation';
@@ -11,13 +12,14 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { supabase } from '../services/supabase';
 
-import { Pin, Trash2, Forward } from 'lucide-react';
+import { Pin, Trash2, Forward, X } from 'lucide-react';
 import type { Message } from '../types';
 
 const ChatScreen: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { startForwarding } = useForwarding();
 
   // State
   const [newMessage, setNewMessage] = useState('');
@@ -28,6 +30,7 @@ const ChatScreen: React.FC = () => {
   const [selectedMessages, setSelectedMessages] = useState<Message[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [deleteMenu, setDeleteMenu] = useState<{ x: number; y: number } | null>(null);
+  const [pinnedMessage, setPinnedMessage] = useState<Message | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -130,7 +133,7 @@ const ChatScreen: React.FC = () => {
   };
 
   const handleToggleDeleteMenu = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent click from bubbling up to the container
+    e.stopPropagation();
     if (deleteMenu) {
       setDeleteMenu(null);
       return;
@@ -141,10 +144,27 @@ const ChatScreen: React.FC = () => {
     }
   };
 
+  const handleForwardMessages = () => {
+    if (selectedMessages.length === 0) return;
+    startForwarding(selectedMessages);
+    navigate('/conversations');
+  };
+
   const canDeleteForAll = useMemo(() => {
     if (!user || selectedMessages.length === 0) return false;
     return selectedMessages.every(msg => msg.senderId === user.id);
   }, [selectedMessages, user]);
+
+  const canPin = useMemo(() => {
+    if (!user || selectedMessages.length !== 1) return false;
+    return selectedMessages[0].senderId === user.id;
+  }, [selectedMessages, user]);
+
+  const handlePinMessage = () => {
+    if (!canPin) return;
+    setPinnedMessage(selectedMessages[0]);
+    clearSelection();
+  };
 
   const handleDeleteForMe = async () => {
     const messageIds = selectedMessages.map(m => m.id);
@@ -166,7 +186,6 @@ const ChatScreen: React.FC = () => {
       toast.error('فشل حذف الرسائل لدى الجميع.');
       console.error('Error deleting for all:', error);
     } else {
-      // Realtime should handle removal for other users. We handle it locally.
       removeMessagesByIds(messageIds);
     }
     clearSelection();
@@ -175,6 +194,21 @@ const ChatScreen: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50" onClick={handleContainerClick}>
       <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
+
+      {pinnedMessage && (
+        <div className="bg-white border-b border-gray-200 p-2 flex justify-between items-center text-sm">
+          <div className="flex items-center text-gray-600 overflow-hidden">
+            <Pin size={16} className="mx-2 flex-shrink-0" />
+            <p className="truncate">{pinnedMessage.text}</p>
+          </div>
+          <div className="flex items-center">
+            <span className="text-green-600 font-semibold ml-2">رسالة مثبتة</span>
+            <button onClick={() => setPinnedMessage(null)} className="p-1 rounded-full hover:bg-gray-200 ml-2">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div
         className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col-reverse min-h-0"
@@ -206,8 +240,8 @@ const ChatScreen: React.FC = () => {
         <div className="text-sm font-medium text-gray-700">{selectedMessages.length} رسالة محددة</div>
         <div className="flex space-x-4">
           <button ref={deleteButtonRef} onClick={handleToggleDeleteMenu} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Trash2 size={20} /></button>
-          <button onClick={clearSelection} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Pin size={20} /></button>
-          <button onClick={clearSelection} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Forward size={20} /></button>
+          <button onClick={handlePinMessage} disabled={!canPin} className="p-2 rounded-full hover:bg-gray-100 text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"><Pin size={20} /></button>
+          <button onClick={handleForwardMessages} className="p-2 rounded-full hover:bg-gray-100 text-gray-600"><Forward size={20} /></button>
         </div>
       </div>
 

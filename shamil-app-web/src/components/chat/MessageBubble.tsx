@@ -1,26 +1,29 @@
 import React from 'react';
-import { FileIcon, Download, MapPin, Clock, AlertCircle } from 'lucide-react'; // Import Clock and AlertCircle
+import { FileIcon, Download, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { AudioPlayer } from '../AudioPlayer';
 import type { Message } from '../../types';
 import { isLocationMessage, extractLocationFromMessage, extractMapUrlFromMessage } from '../../utils/messageHelpers';
 import { getFilenameFromPath } from '../../utils/fileHelpers';
 import useLongPress from '../../hooks/useLongPress';
+import { MiniMessageBubble } from './MiniMessageBubble'; // Import the new component
+import { useAuth } from '../../context/AuthContext';
 
 interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   onLongPress: (target: EventTarget | null, message: Message) => void;
   isSelected?: boolean;
-  onClick?: (message: Message, e?: React.MouseEvent | React.TouchEvent) => void; // Allow TouchEvent
+  onClick?: (message: Message, e?: React.MouseEvent | React.TouchEvent) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress, isSelected = false, onClick }) => {
+  const { user } = useAuth();
+
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Correctly type the event handler
   const handleOnClick = (e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
     onClick && onClick(message, e);
   };
@@ -32,6 +35,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
   );
 
   const renderMessageContent = () => {
+    // Handle forwarded block
+    if (message.message_type === 'forwarded_block') {
+      try {
+        const forwardedMessages: Message[] = JSON.parse(message.text);
+        return (
+          <div className="border-2 border-red-400 bg-green-100 rounded-lg p-2 w-full">
+            <p className="font-bold text-xs text-gray-600 mb-2">رسائل محولة</p>
+            {forwardedMessages.map(msg => (
+              <MiniMessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === user?.id} />
+            ))}
+          </div>
+        );
+      } catch (error) {
+        console.error("Failed to parse forwarded messages:", error);
+        return <p className="text-red-500">خطأ في عرض الرسائل المحولة.</p>;
+      }
+    }
+
     if ((message as any).message_type === 'image' && (message as any).signedUrl) {
       return <img src={(message as any).signedUrl} alt="Image message" className="rounded-lg max-w-full h-auto" style={{ maxHeight: '300px' }} />;
     }
