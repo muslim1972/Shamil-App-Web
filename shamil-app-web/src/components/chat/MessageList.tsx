@@ -8,14 +8,16 @@ interface MessageListProps {
   loading: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onMessageLongPress: (target: EventTarget | null, message: Message) => void;
+  selectedMessages?: Message[];
+  onMessageClick?: (message: Message, e?: React.MouseEvent) => void;
 }
 
-export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, messagesEndRef, onMessageLongPress }) => {
+export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, messagesEndRef, onMessageLongPress, selectedMessages = [], onMessageClick }) => {
   const { user } = useAuth();
 
   const renderMessage = useCallback((message: Message) => {
     const isOwnMessage = message.senderId === user?.id;
-    
+
     return (
       <div
         key={message.id} // Use stable key
@@ -25,10 +27,20 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, m
           message={message}
           isOwnMessage={isOwnMessage}
           onLongPress={onMessageLongPress}
+          isSelected={selectedMessages.some(m => m.id === message.id)}
+          onClick={(message: Message, e?: React.MouseEvent) => {
+            // منع انتشار الحدث لضمان عدم التأثير على التمرير
+            if (e) {
+              e.stopPropagation();
+            }
+            if (onMessageClick) {
+              onMessageClick(message, e);
+            }
+          }}
         />
       </div>
     );
-  }, [user?.id, onMessageLongPress]);
+  }, [user?.id, onMessageLongPress, selectedMessages, onMessageClick]);
 
   if (messages.length === 0) {
     return (

@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileIcon, Download, MapPin } from 'lucide-react';
+import { FileIcon, Download, MapPin, Clock, AlertCircle } from 'lucide-react'; // Import Clock and AlertCircle
 import { AudioPlayer } from '../AudioPlayer';
 import type { Message } from '../../types';
 import { isLocationMessage, extractLocationFromMessage, extractMapUrlFromMessage } from '../../utils/messageHelpers';
@@ -10,9 +10,11 @@ interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   onLongPress: (target: EventTarget | null, message: Message) => void;
+  isSelected?: boolean;
+  onClick?: (message: Message, e?: React.MouseEvent) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress, isSelected = false, onClick }) => {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -62,21 +64,28 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
   };
 
   return (
-    <div 
+    <div
       {...longPressEvents}
       data-id={message.id}
+      onClick={(e: React.MouseEvent) => onClick && onClick(message, e)}
       className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
       isOwnMessage
         ? 'bg-indigo-500 text-white'
         : 'bg-white text-gray-800 shadow-sm'
-    }`}>
+      } ${isSelected ? 'border-4 border-green-500' : ''}`}>
       {renderMessageContent()}
       <div
-        className={`text-xs mt-1 text-right w-full ${
+        className={`flex items-center justify-end text-xs mt-1 w-full ${
           isOwnMessage ? 'text-indigo-200' : 'text-gray-500'
         }`}
       >
         {formatTime(message.timestamp)}
+        {isOwnMessage && message.status === 'pending' && (
+          <Clock size={12} className="ml-1" />
+        )}
+        {isOwnMessage && message.status === 'failed' && (
+          <AlertCircle size={12} className="ml-1 text-red-400" />
+        )}
       </div>
     </div>
   );

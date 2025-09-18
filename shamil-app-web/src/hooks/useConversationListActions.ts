@@ -61,8 +61,8 @@ export const useConversationListActions = (setConversations: React.Dispatch<Reac
         const { error } = await supabase.rpc('clear_and_hide_conversation', { p_conversation_id: selectedConversation.id });
         return { error };
       },
-      'حدث خطأ أثناء محاولة حذف المحادثة.',
-      'hide' // تحديد نوع العملية
+      'لم نتمكن من حذف المحادثة لديك.',
+      'delete_for_me' // تحديد نوع العملية
     );
   }, [selectedConversation, handleDbOperation]);
 

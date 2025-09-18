@@ -25,6 +25,7 @@ export interface Message {
   signedUrl?: string | null;
   caption?: string | null;
   media_metadata?: { duration?: number; [key: string]: any } | null;
+  status?: 'pending' | 'sent' | 'failed';
 }
 
 export interface AuthState {

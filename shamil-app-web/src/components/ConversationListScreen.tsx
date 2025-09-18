@@ -7,7 +7,7 @@ import useLongPress from '../hooks/useLongPress';
 import type { Conversation } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
-import { LogOut, MessageSquarePlus, Archive, Lock, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
+import { LogOut, MessageSquarePlus, Archive, Trash2, Ban, QrCode, Image, Camera } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
 import SearchDialog from './SearchDialog';
 import { supabase } from '../services/supabase';
@@ -76,6 +76,7 @@ const ConversationListScreen: React.FC = () => {
   const {
     handleConversationOptions,
     handleArchiveConversation,
+    handleHideConversation,
     handleDeleteConversationForAll,
     closeActionMenu
   } = useConversationListActions(setConversations, fetchConversations);
@@ -276,7 +277,7 @@ const ConversationListScreen: React.FC = () => {
           <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white dark:bg-slate-800 ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="py-1">
               <Menu.Item>{({ active }) => (<button onClick={() => { handleArchiveConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Archive className="mr-3 h-5 w-5" />أرشفة المحادثة</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Lock className="mr-3 h-5 w-5" />إخفاء المحادثة</button>)}</Menu.Item>
+              <Menu.Item>{({ active }) => (<button onClick={() => { handleHideConversation(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-slate-700`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدي</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => { handleDeleteConversationForAll(); handleCloseMenu(); }} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف المحادثة لدى الجميع</button>)}</Menu.Item>
               <Menu.Item>{({ active }) => (<button onClick={() => handleCloseMenu()} className={`${active ? 'bg-slate-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Ban className="mr-3 h-5 w-5" />حظر المستخدم</button>)}</Menu.Item>
             </div>

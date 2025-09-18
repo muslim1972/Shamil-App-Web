@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Fragment } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useChatMessages } from '../hooks/useChatMessages';
@@ -9,21 +9,24 @@ import { MessageList } from './chat/MessageList';
 import { MessageForm } from './chat/MessageForm';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { Menu, Transition } from '@headlessui/react';
-import { Pin, Trash2, CheckSquare } from 'lucide-react';
+
+import { Pin, Trash2 } from 'lucide-react';
 import type { Message } from '../types';
 
 const ChatScreen: React.FC = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth();
 
   // State
   const [newMessage, setNewMessage] = useState('');
   const [isAttachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [messageMenu, setMessageMenu] = useState<{ x: number; y: number; message: Message } | null>(null);
+
+  const [selectedMessages, setSelectedMessages] = useState<Message[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Custom hooks
   const { messages, loading, sendMessage, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage, conversationDetails, scrollToBottom } = useChatMessages({ conversationId });
@@ -31,16 +34,51 @@ const ChatScreen: React.FC = () => {
   const { handleSendLocation } = useLocation({ sendMessage });
 
   // Menu Handlers
+
+
+  const handleMessageClick = (message: Message, e?: React.MouseEvent) => {
+    if (!isSelectionMode) return;
+
+    // منع انتشار الحدث للحاوية الرئيسية
+    if (e) {
+      e.stopPropagation();
+    }
+
+    const isSelected = selectedMessages.some(m => m.id === message.id);
+    if (isSelected) {
+      const newSelectedMessages = selectedMessages.filter(m => m.id !== message.id);
+      setSelectedMessages(newSelectedMessages);
+      if (newSelectedMessages.length === 0) {
+        setIsSelectionMode(false);
+      }
+    } else {
+      setSelectedMessages([...selectedMessages, message]);
+    }
+  };
+
   const handleMessageLongPress = useCallback((target: EventTarget | null, message: Message) => {
     if (!target) return;
-    const targetElement = target as HTMLElement;
-    const rect = targetElement.getBoundingClientRect();
-    setMessageMenu({ x: rect.left, y: rect.bottom, message });
-  }, []);
 
-  const handleCloseMessageMenu = () => {
-    setMessageMenu(null);
-  };
+
+
+    // إذا لم نكن في وضع التحديد، ابدأ وضع التحديد
+    if (!isSelectionMode) {
+      setIsSelectionMode(true);
+      setSelectedMessages([message]);
+    } else {
+      // إذا كنا بالفعل في وضع التحديد، أضف/أزل الرسالة من القائمة المحددة
+      const isSelected = selectedMessages.some(m => m.id === message.id);
+      if (isSelected) {
+        const newSelectedMessages = selectedMessages.filter(m => m.id !== message.id);
+        setSelectedMessages(newSelectedMessages);
+        if (newSelectedMessages.length === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        setSelectedMessages([...selectedMessages, message]);
+      }
+    }
+  }, [isSelectionMode, selectedMessages]);
 
   const displayConversationName = conversationDetails?.name || 'محادثة';
 
@@ -65,7 +103,7 @@ const ChatScreen: React.FC = () => {
     };
   }, []);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (newMessage.trim() === '' || !conversationId) return;
 
@@ -74,27 +112,12 @@ const ChatScreen: React.FC = () => {
       return;
     }
 
-    try {
-      setIsSending(true);
-      const messagePromise = sendMessage(newMessage);
-      setNewMessage('');
-      await messagePromise;
-      scrollToBottom();
-      toast.success('تم إرسال الرسالة');
+    sendMessage(newMessage); // Send message optimistically
+    setNewMessage(''); // Clear the input
 
-      // التركيز على حقل الإدخال بعد إرسال الرسالة
-      setTimeout(() => {
-        const inputElement = document.querySelector('textarea') as HTMLTextAreaElement;
-        if (inputElement) {
-          inputElement.focus();
-        }
-      }, 100);
-    } catch (error) {
-      console.error('فشل في إرسال الرسالة:', error);
-      toast.error('فشل في إرسال الرسالة، حاول مرة أخرى');
-    } finally {
-      setIsSending(false);
-    }
+    // Focus should be handled carefully. Since the state update is quick,
+    // a direct focus call should work as the component re-renders.
+    inputRef.current?.focus();
   };
 
   const handleBack = () => {
@@ -127,10 +150,27 @@ const ChatScreen: React.FC = () => {
       {!isOnline && (
         <div className="bg-red-500 text-white text-center py-1 text-sm">غير متصل بالإنترنت</div>
       )}
-      
+
       <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col justify-end" id="messages-container">
+      <div
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col justify-end"
+        id="messages-container"
+        onClick={(e) => {
+          // Only deselect if clicking directly on the container, not on a message
+          if (isSelectionMode && e.target === e.currentTarget) {
+            setSelectedMessages([]);
+            setIsSelectionMode(false);
+          }
+        }}
+        onTouchStart={(e) => {
+          // Only deselect if touching directly on the container, not on a message
+          if (isSelectionMode && e.target === e.currentTarget) {
+            setSelectedMessages([]);
+            setIsSelectionMode(false);
+          }
+        }}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -144,6 +184,8 @@ const ChatScreen: React.FC = () => {
             loading={loading}
             messagesEndRef={messagesEndRef}
             onMessageLongPress={handleMessageLongPress}
+            selectedMessages={selectedMessages}
+            onMessageClick={handleMessageClick}
           />
         )}
       </div>
@@ -167,33 +209,66 @@ const ChatScreen: React.FC = () => {
           pickAndSendMedia={pickAndSendMedia}
           handleSendLocation={handleSendLocation}
           disabled={!isOnline || isSending}
+          inputRef={inputRef}
         />
       </div>
 
-      {/* Message Context Menu */}
-      <Transition as={Fragment} show={!!messageMenu}>
-        <div className="fixed inset-0 z-20" onClick={handleCloseMessageMenu} />
-      </Transition>
-      <Transition
-        as={Fragment}
-        show={!!messageMenu}
-        enter="transition ease-out duration-100" enterFrom="transform opacity-0 scale-95" enterTo="transform opacity-100 scale-100"
-        leave="transition ease-in duration-75" leaveFrom="transform opacity-100 scale-100" leaveTo="transform opacity-0 scale-95"
-      >
-        <Menu as="div" className="fixed z-30" style={{ top: messageMenu?.y, left: messageMenu?.x }}>
-          <Menu.Items static className="origin-top-left mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none">
-            <div className="py-1">
-              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><CheckSquare className="mr-3 h-5 w-5" />تأشير</button>)}</Menu.Item>
-              {messageMenu?.message?.senderId === user?.id && (
-                <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><Pin className="mr-3 h-5 w-5" />تثبيت</button>)}</Menu.Item>
-              )}
-              <div className="px-4 my-1"><hr /></div>
-              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-gray-700`}><Trash2 className="mr-3 h-5 w-5" />حذف لدي</button>)}</Menu.Item>
-              <Menu.Item>{({ active }) => (<button onClick={handleCloseMessageMenu} className={`${active ? 'bg-gray-100' : ''} group flex items-center w-full px-4 py-2 text-sm text-red-600`}><Trash2 className="mr-3 h-5 w-5" />حذف لدى الجميع</button>)}</Menu.Item>
-            </div>
-          </Menu.Items>
-        </Menu>
-      </Transition>
+      {/* Selection Mode Toolbar */}
+      {isSelectionMode && (
+        <div className="bg-white border-t border-gray-200 p-3 flex justify-between items-center">
+          <div className="text-sm font-medium text-gray-700">
+            {selectedMessages.length} رسالة محددة
+          </div>
+          <div className="flex space-x-4">
+            <button
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              onClick={() => {
+                setSelectedMessages([]);
+                setIsSelectionMode(false);
+              }}
+            >
+              <Trash2 size={20} />
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              onClick={() => {
+                // سيتم تنفيذ منطق التثبيت لاحقاً
+                setSelectedMessages([]);
+                setIsSelectionMode(false);
+              }}
+            >
+              <Pin size={20} />
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              onClick={() => {
+                // سيتم تنفيذ منطق إعادة التوجيه لاحقاً
+                setSelectedMessages([]);
+                setIsSelectionMode(false);
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+            <button
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+              onClick={() => {
+                // سيتم تنفيذ منطق التعديل لاحقاً
+                setSelectedMessages([]);
+                setIsSelectionMode(false);
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 };

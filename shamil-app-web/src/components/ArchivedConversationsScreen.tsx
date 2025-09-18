@@ -12,11 +12,11 @@ import useLongPress from '../hooks/useLongPress';
 
 const ArchivedConversationsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth(); // signOut is removed
   const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  // searchTerm state is removed
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
   const longPressTriggered = useRef(false); // Ref to prevent click after long press
 
@@ -122,19 +122,9 @@ const ArchivedConversationsScreen: React.FC = () => {
     navigate('/conversations');
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-      navigate('/auth');
-    } catch (error) {
-      console.error('فشل تسجيل الخروج:', error);
-    }
-  };
+  // handleLogout function is removed
 
-  // تصفية المحادثات المؤرشفة حسب مصطلح البحث
-  const filteredConversations = archivedConversations.filter(conversation =>
-    (conversation.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // filteredConversations logic is removed
 
   // Component for each archived conversation item in the list
   const ArchivedConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = React.memo(({ conversation, onSelect }) => {
@@ -225,43 +215,21 @@ const ArchivedConversationsScreen: React.FC = () => {
             </button>
             <h1 className="text-xl font-bold">المحادثات المؤرشفة</h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-full hover:bg-indigo-500 transition-colors"
-            aria-label="تسجيل الخروج"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-          </button>
+          {/* Logout button removed */}
         </div>
 
-        {/* Search Bar */}
-        <div className="mt-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="بحث عن محادثة مؤرشفة..."
-              className="w-full p-2 pl-10 rounded-lg bg-indigo-500 text-white placeholder-indigo-200 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 absolute left-3 top-2.5 text-indigo-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
-        </div>
+        {/* Search Bar removed */}
       </div>
 
       {/* Archived Conversations List */}
       <div className="flex-1 overflow-y-auto bg-gray-50">
-        {filteredConversations.length === 0 ? (
+        {archivedConversations.length === 0 ? (
           <div className="text-center p-8 text-gray-500">
-            {searchTerm ? 'لا توجد محادثات مؤرشفة تطابق بحثك' : 'لا توجد محادثات مؤرشفة'}
+            {'لا توجد محادثات مؤرشفة'}
           </div>
         ) : (
           <ul>
-            {filteredConversations.map((conversation) => (
+            {archivedConversations.map((conversation) => (
               <div key={conversation.id} data-id={conversation.id} {...longPressEvents}>
                 <ArchivedConversationItem conversation={conversation} onSelect={handleItemClick} />
               </div>

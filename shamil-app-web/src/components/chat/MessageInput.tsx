@@ -124,9 +124,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               <CornerDownLeft size={18} className="transform -rotate-90" />
             </button>
             <button
-              type="submit"
+              type="button"
+              onClick={onSendMessage}
               disabled={disabled || isTextTooLong || isRecording}
-              onClick={(e) => { if (!disabled && !isTextTooLong && !isRecording) onSendMessage && onSendMessage(e as any); }}
               className={`rounded-full p-3 flex-shrink-0 transition-all ${
                 disabled || isTextTooLong || isRecording
                   ? 'bg-gray-400 cursor-not-allowed'

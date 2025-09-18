@@ -1,7 +1,7 @@
 // MessageForm Component
 // This component handles the message input form
 
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { MessageInput } from './MessageInput';
 import { AttachmentMenu } from './AttachmentMenu';
 import { RecordingHeader } from './RecordingHeader';
@@ -21,6 +21,7 @@ interface MessageFormProps {
   pickAndSendMedia: (type: string) => void;
   handleSendLocation: () => void;
   disabled?: boolean;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
 }
 
 export const MessageForm: React.FC<MessageFormProps> = ({
@@ -37,9 +38,9 @@ export const MessageForm: React.FC<MessageFormProps> = ({
   handleSendRecording,
   pickAndSendMedia,
   handleSendLocation,
-  disabled = false
+  disabled = false,
+  inputRef
 }) => {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // ضبط ارتفاع textarea تلقائيًا بناءً على محتواه
   useEffect(() => {
@@ -92,7 +93,6 @@ export const MessageForm: React.FC<MessageFormProps> = ({
   return (
     <form
       className={`bg-white border-t border-gray-200 p-4 relative ${disabled ? 'opacity-60' : ''}`}
-      onSubmit={onSendMessage}
       onKeyDown={handleKeyDown}
     >
       <AttachmentMenu

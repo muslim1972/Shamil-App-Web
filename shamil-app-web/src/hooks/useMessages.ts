@@ -3,18 +3,7 @@ import { supabase, supabaseUrl } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import * as tus from 'tus-js-client';
-
-interface Message {
-  id: string;
-  conversationId: string;
-  text: string;
-  senderId: string;
-  timestamp: string;
-  message_type: 'text' | 'image' | 'video' | 'audio' | 'file';
-  signedUrl: string | null;
-  caption?: string | null;
-  media_metadata?: { duration: number } | null;
-}
+import type { Message } from '../types';
 
 interface UseChatMessagesProps {
   conversationId?: string;
@@ -37,10 +26,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+        .rpc('get_visible_messages', { p_conversation_id: conversationId });
 
       if (error) throw error;
 
@@ -65,6 +51,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
             caption: msg.caption,
             media_metadata: msg.media_metadata,
             signedUrl,
+            status: 'sent', // Mark existing messages as sent
           };
         })
       );
@@ -136,11 +123,20 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
             caption: newMessage.caption,
             media_metadata: newMessage.media_metadata,
             signedUrl,
+            status: 'sent',
           };
 
             setMessages((currentMessages) => {
-              // avoid duplicates if message already exists
-              if (currentMessages.some(m => m.id === formattedNewMessage.id)) return currentMessages;
+              // If the message is from the current user, it might already be in the list optimistically.
+              // In that case, we update it. Otherwise, we add it.
+              if (newMessage.sender_id === user?.id) {
+                // The optimistic message won't have the final ID, so we can't find it by ID yet.
+                // The proper way is to replace it when the send function gets the successful response.
+                // The realtime listener should primarily handle messages from OTHER users.
+                if (currentMessages.some(m => m.id === formattedNewMessage.id)) {
+                    return currentMessages; // Already exists, do nothing.
+                }
+              }
               return [...currentMessages, formattedNewMessage];
             });
         }
@@ -152,7 +148,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, user?.id]);
 
   // Initial data fetch
   useEffect(() => {
@@ -181,64 +177,40 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
     async (text: string) => {
       if (!text.trim() || !conversationId || !user) return;
 
+      const tempId = `temp_${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: tempId,
+        conversationId: conversationId,
+        text: text.trim(),
+        senderId: user.id,
+        timestamp: new Date().toISOString(),
+        message_type: 'text',
+        signedUrl: null,
+        status: 'pending',
+      };
+
+      setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
+
       try {
         const { data, error } = await supabase.from('messages').insert({
           conversation_id: conversationId,
           sender_id: user.id,
           content: text.trim(),
           message_type: 'text',
-        }).select();
+        }).select().single(); // Use .single() to get one record back
 
         if (error) throw error;
 
-        // Optimistically update the UI
-        if (data && data.length > 0) {
-          const newMessage = data[0];
-          // generate a stronger temporary id to avoid collisions
-          const tempMessageId = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `temp-${Date.now()}-${Math.floor(Math.random()*100000)}`;
+        // Update the message from pending to sent
+        setMessages((currentMessages) =>
+          currentMessages.map((msg) =>
+            msg.id === tempId
+              ? { ...msg, id: data.id, timestamp: new Date(data.created_at).toISOString(), status: 'sent' }
+              : msg
+          )
+        );
 
-          // add temp message if not already present
-          setMessages((currentMessages) => {
-            const exists = currentMessages.some(m => m.id === newMessage.id || m.id === tempMessageId);
-            if (exists) return currentMessages;
-            return [
-              ...currentMessages,
-              {
-                id: tempMessageId,
-                conversationId: newMessage.conversation_id,
-                text: newMessage.content,
-                senderId: newMessage.sender_id,
-                timestamp: new Date().toISOString(),
-                message_type: 'text' as const,
-                signedUrl: null,
-              },
-            ];
-          });
-
-          // replace temp with real message when available
-          setTimeout(() => {
-            setMessages((currentMessages) => {
-              // if real message already exists, remove any temp duplicates
-              if (currentMessages.some(m => m.id === newMessage.id)) {
-                return currentMessages.filter(m => m.id !== tempMessageId);
-              }
-              return currentMessages.map(msg =>
-                msg.id === tempMessageId
-                  ? {
-                      id: newMessage.id,
-                      conversationId: newMessage.conversation_id,
-                      text: newMessage.content,
-                      senderId: newMessage.sender_id,
-                      timestamp: new Date(newMessage.created_at).toISOString(),
-                      message_type: 'text' as const,
-                      signedUrl: null,
-                    }
-                  : msg
-              );
-            });
-          }, 1000);
-        }
-
+        // Also update user_conversation_settings
         await supabase
           .from('user_conversation_settings')
           .upsert(
@@ -253,7 +225,13 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
 
       } catch (err: any) {
         console.error('Error sending message:', err);
-        throw err;
+        // Update the message status to failed
+        setMessages((currentMessages) =>
+          currentMessages.map((msg) =>
+            msg.id === tempId ? { ...msg, status: 'failed' } : msg
+          )
+        );
+        // Optionally re-throw or handle the error for the UI
       }
     },
     [conversationId, user]
