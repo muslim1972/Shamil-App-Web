@@ -40,7 +40,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
       const formattedMessages: Message[] = await Promise.all(
         data.map(async (msg: any) => {
           let signedUrl = null;
-          if (msg.message_type !== 'text') {
+          if (msg.message_type !== 'text' && msg.message_type !== 'forwarded_block') {
             const { data: signedUrlData } = await supabase.storage
               .from('call-files')
               .createSignedUrl(msg.content, 3600);
@@ -112,7 +112,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
           const newMessage = payload.new as any;
           let signedUrl = null;
 
-          if (newMessage.message_type !== 'text') {
+          if (newMessage.message_type !== 'text' && newMessage.message_type !== 'forwarded_block') {
             const { data: signedUrlData } = await supabase.storage
               .from('call-files')
               .createSignedUrl(newMessage.content, 3600);

@@ -50,8 +50,8 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, m
   }
 
   return (
-    <div className="space-y-4">
-      {messages.slice().reverse().map(renderMessage)}
+    <div className="space-y-4 flex flex-col-reverse">
+      {messages.map(renderMessage)}
       <div ref={messagesEndRef} />
     </div>
   );

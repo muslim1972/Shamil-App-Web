@@ -16,11 +16,12 @@ export const MiniMessageBubble: React.FC<MiniMessageBubbleProps> = React.memo(({
 
   return (
     <div
-      className={`max-w-xs lg:max-w-md px-3 py-1.5 rounded-lg my-1 ${
+      className={`px-3 py-1.5 rounded-lg my-1 ${
       isOwnMessage
         ? 'bg-indigo-500 text-white'
         : 'bg-white text-gray-800 shadow-sm'
-      }`}>
+      }`}
+      style={{ width: "auto", maxWidth: "80%" }}>
       <p className="text-sm">{message.text}</p>
       <div
         className={`flex items-center justify-end text-xs mt-1 w-full ${

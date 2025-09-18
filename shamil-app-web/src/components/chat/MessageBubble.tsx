@@ -40,11 +40,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
       try {
         const forwardedMessages: Message[] = JSON.parse(message.text);
         return (
-          <div className="border-2 border-red-400 bg-green-100 rounded-lg p-2 w-full">
+          <div className="border-2 border-red-400 bg-green-100 rounded-lg p-2 mx-4" style={{ width: "calc(100% - 32px)" }}>
             <p className="font-bold text-xs text-gray-600 mb-2">رسائل محولة</p>
-            {forwardedMessages.map(msg => (
-              <MiniMessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === user?.id} />
-            ))}
+            <div className="flex flex-col space-y-2">
+              {forwardedMessages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.senderId === user?.id ? 'justify-end' : 'justify-start'}`}>
+                  <MiniMessageBubble message={msg} isOwnMessage={msg.senderId === user?.id} />
+                </div>
+              ))}
+            </div>
           </div>
         );
       } catch (error) {
@@ -97,7 +101,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
     <div
       {...longPressEvents}
       data-id={message.id}
-      className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+      className={`${message.message_type === 'forwarded_block' ? 'w-full' : 'max-w-xs lg:max-w-md'} px-4 py-2 rounded-lg ${
       isOwnMessage
         ? 'bg-indigo-500 text-white'
         : 'bg-white text-gray-800 shadow-sm'
