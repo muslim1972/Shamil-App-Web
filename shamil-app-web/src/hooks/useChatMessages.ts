@@ -18,7 +18,7 @@ interface ConversationDetails {
 
 export const useChatMessages = ({ conversationId }: UseChatMessagesProps = {}) => {
   const { user } = useAuth();
-  const { messages, loading, sendMessage, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage } = useMessages({ conversationId });
+  const { messages, loading, sendMessage, messagesEndRef, isUploading, pickAndSendMedia, sendAudioMessage, removeMessagesByIds } = useMessages({ conversationId });
   const [conversationDetails, setConversationDetails] = useState<ConversationDetails | null>(null);
   
   // Ref for messages container
@@ -109,6 +109,7 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps = {}) =
     sendAudioMessage,
     conversationDetails,
     scrollToBottom,
-    messagesContainerRef
+    messagesContainerRef,
+    removeMessagesByIds
   };
 };

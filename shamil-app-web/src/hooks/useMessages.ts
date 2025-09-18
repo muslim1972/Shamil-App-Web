@@ -19,6 +19,12 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesChannelRef = useRef<RealtimeChannel | null>(null);
 
+  const removeMessagesByIds = useCallback((messageIds: string[]) => {
+    setMessages(currentMessages =>
+        currentMessages.filter(msg => !messageIds.includes(msg.id))
+    );
+  }, []);
+
   // Fetch messages for the conversation
   const fetchMessages = useCallback(async () => {
     if (!conversationId) return;
@@ -412,5 +418,6 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
     sendAudioMessage,
     conversationDetails,
     scrollToBottom,
+    removeMessagesByIds,
   };
 };
