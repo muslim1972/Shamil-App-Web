@@ -11,7 +11,7 @@ interface MessageBubbleProps {
   isOwnMessage: boolean;
   onLongPress: (target: EventTarget | null, message: Message) => void;
   isSelected?: boolean;
-  onClick?: (message: Message, e?: React.MouseEvent) => void;
+  onClick?: (message: Message, e?: React.MouseEvent | React.TouchEvent) => void; // Allow TouchEvent
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message, isOwnMessage, onLongPress, isSelected = false, onClick }) => {
@@ -20,7 +20,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const longPressEvents = useLongPress((target) => onLongPress(target, message), { delay: 500 });
+  // Correctly type the event handler
+  const handleOnClick = (e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    onClick && onClick(message, e);
+  };
+
+  const longPressEvents = useLongPress(
+    (target) => onLongPress(target, message),
+    handleOnClick,
+    { delay: 500 }
+  );
 
   const renderMessageContent = () => {
     if ((message as any).message_type === 'image' && (message as any).signedUrl) {
@@ -67,7 +76,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
     <div
       {...longPressEvents}
       data-id={message.id}
-      onClick={(e: React.MouseEvent) => onClick && onClick(message, e)}
       className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
       isOwnMessage
         ? 'bg-indigo-500 text-white'

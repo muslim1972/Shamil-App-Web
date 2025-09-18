@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Fragment, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, Fragment, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabase';
@@ -12,15 +12,12 @@ import useLongPress from '../hooks/useLongPress';
 
 const ArchivedConversationsScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth(); // signOut is removed
+  const { user } = useAuth();
   const [archivedConversations, setArchivedConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // searchTerm state is removed
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
-  const longPressTriggered = useRef(false); // Ref to prevent click after long press
 
-  // جلب المحادثات المؤرشفة
   const fetchArchivedConversations = useCallback(async () => {
     if (!user) {
       navigate('/auth');
@@ -31,12 +28,9 @@ const ArchivedConversationsScreen: React.FC = () => {
     setError(null);
 
     try {
-      const { data, error } = await supabase
-        .rpc('get_user_archived_conversations');
+      const { data, error } = await supabase.rpc('get_user_archived_conversations');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data) {
         const formattedConversations: Conversation[] = data.map((conv: any) => ({
@@ -68,16 +62,9 @@ const ArchivedConversationsScreen: React.FC = () => {
 
   const handleCloseMenu = useCallback(() => {
     setMenu(null);
-    longPressTriggered.current = false;
   }, []);
 
-  // استخدام دوال إجراءات المحادثات المؤرشفة
-  const {
-    handleConversationOptions,
-    handleUnarchiveConversation,
-    handleHideConversation,
-    handleDeleteConversationForAll
-  } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
+  const { handleConversationOptions, handleUnarchiveConversation, handleHideConversation, handleDeleteConversationForAll } = useArchivedConversationListActions(setArchivedConversations, fetchArchivedConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target) return;
@@ -92,42 +79,28 @@ const ArchivedConversationsScreen: React.FC = () => {
     const conversation = archivedConversations.find(c => c.id === conversationId);
     if (!conversation) return;
 
-    // Prevent click event from triggering
-    longPressTriggered.current = true;
-
-    // Get position for menu
     const rect = conversationElement.getBoundingClientRect();
-    setMenu({
-      x: rect.left,
-      y: rect.bottom,
-      conversation
-    });
+    setMenu({ x: rect.left, y: rect.bottom, conversation });
 
-    // Use the action hook to select the conversation
     handleConversationOptions(conversation);
   }, [archivedConversations, handleConversationOptions]);
 
-  const longPressEvents = useLongPress(handleLongPress, { delay: 500 });
-
-  // Handle click events to prevent navigation after long press
-  const handleItemClick = useCallback((conversationId: string) => {
-    if (longPressTriggered.current) {
-      longPressTriggered.current = false;
-      return;
+  const handleConversationClick = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    const conversationElement = (event.currentTarget as HTMLElement).closest('[data-id]');
+    if (!conversationElement) return;
+    const conversationId = conversationElement.getAttribute('data-id');
+    if (conversationId) {
+        handleSelectConversation(conversationId);
     }
-    handleSelectConversation(conversationId);
-  }, [handleSelectConversation]);
+  };
+
+  const longPressEvents = useLongPress(handleLongPress, handleConversationClick, { delay: 500 });
 
   const handleBack = () => {
     navigate('/conversations');
   };
 
-  // handleLogout function is removed
-
-  // filteredConversations logic is removed
-
-  // Component for each archived conversation item in the list
-  const ArchivedConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = React.memo(({ conversation, onSelect }) => {
+  const ArchivedConversationItem: React.FC<{ conversation: Conversation; }> = React.memo(({ conversation }) => {
     const formattedTimestamp = useMemo(() => {
       if (!conversation.timestamp) return '';
       try {
@@ -139,11 +112,7 @@ const ArchivedConversationsScreen: React.FC = () => {
     }, [conversation.timestamp]);
 
     return (
-      // The onClick is now on the li itself
-      <li
-        onClick={() => onSelect(conversation.id)}
-        className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700"
-      >
+      <div className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center space-x-4 rtl:space-x-reverse pointer-events-none">
           <div className="flex-shrink-0">
             <div className="relative inline-flex items-center justify-center w-12 h-12 overflow-hidden bg-slate-200 dark:bg-slate-600 rounded-full">
@@ -166,7 +135,7 @@ const ArchivedConversationsScreen: React.FC = () => {
             </p>
           </div>
         </div>
-      </li>
+      </div>
     );
   });
 
@@ -200,7 +169,6 @@ const ArchivedConversationsScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Header */}
       <div className="bg-indigo-600 text-white p-4 shadow-md">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
@@ -215,13 +183,9 @@ const ArchivedConversationsScreen: React.FC = () => {
             </button>
             <h1 className="text-xl font-bold">المحادثات المؤرشفة</h1>
           </div>
-          {/* Logout button removed */}
         </div>
-
-        {/* Search Bar removed */}
       </div>
 
-      {/* Archived Conversations List */}
       <div className="flex-1 overflow-y-auto bg-gray-50">
         {archivedConversations.length === 0 ? (
           <div className="text-center p-8 text-gray-500">
@@ -230,15 +194,14 @@ const ArchivedConversationsScreen: React.FC = () => {
         ) : (
           <ul>
             {archivedConversations.map((conversation) => (
-              <div key={conversation.id} data-id={conversation.id} {...longPressEvents}>
-                <ArchivedConversationItem conversation={conversation} onSelect={handleItemClick} />
-              </div>
+              <li key={conversation.id} data-id={conversation.id} {...longPressEvents}>
+                <ArchivedConversationItem conversation={conversation} />
+              </li>
             ))}
           </ul>
         )}
       </div>
 
-      {/* Context Menu */}
       <Transition as={Fragment} show={!!menu}>
         {/* ... Menu backdrop ... */}
       </Transition>

@@ -5,6 +5,7 @@ type Target = EventTarget | null;
 
 const useLongPress = (
   onLongPress: (target: Target) => void,
+  onClick: (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => void,
   { delay = 500 } = {}
 ) => {
   const timeout = useRef<NodeJS.Timeout>();
@@ -13,12 +14,9 @@ const useLongPress = (
 
   const start = useCallback(
     (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
-      console.log("start");
-      // We store the event target, as the event object itself will be reused by React
       targetRef.current = event.currentTarget;
       longPressTriggered.current = false;
       timeout.current = setTimeout(() => {
-        console.log("long press triggered");
         longPressTriggered.current = true;
         onLongPress(targetRef.current);
       }, delay);
@@ -27,18 +25,19 @@ const useLongPress = (
   );
 
   const clear = useCallback(() => {
-    console.log("clear");
     timeout.current && clearTimeout(timeout.current);
   }, []);
 
   const end = useCallback(() => {
-    console.log("end");
     clear();
-    // Only reset if long press wasn't triggered
-    if (!longPressTriggered.current) {
-      // We don't do anything here, just clear the timeout
-    }
   }, [clear]);
+
+  const handleClick = (e: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    if (longPressTriggered.current) {
+      return;
+    }
+    onClick(e);
+  };
 
   // We must prevent the default context menu from showing on long press
   const handleContextMenu = (e: React.MouseEvent<HTMLElement>) => {
@@ -50,6 +49,7 @@ const useLongPress = (
     onTouchStart: (e: React.TouchEvent<HTMLElement>) => start(e),
     onMouseUp: end,
     onTouchEnd: end,
+    onClick: handleClick,
     onContextMenu: handleContextMenu, // Prevent right-click menu
   };
 };

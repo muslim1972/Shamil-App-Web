@@ -9,7 +9,7 @@ interface MessageListProps {
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onMessageLongPress: (target: EventTarget | null, message: Message) => void;
   selectedMessages?: Message[];
-  onMessageClick?: (message: Message, e?: React.MouseEvent) => void;
+  onMessageClick?: (message: Message, e?: React.MouseEvent | React.TouchEvent) => void; // Updated type
 }
 
 export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, messagesEndRef, onMessageLongPress, selectedMessages = [], onMessageClick }) => {
@@ -21,14 +21,13 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, m
     return (
       <div
         key={message.id} // Use stable key
-        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-      >
+        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
         <MessageBubble
           message={message}
           isOwnMessage={isOwnMessage}
           onLongPress={onMessageLongPress}
           isSelected={selectedMessages.some(m => m.id === message.id)}
-          onClick={(message: Message, e?: React.MouseEvent) => {
+          onClick={(message: Message, e?: React.MouseEvent | React.TouchEvent) => { // Updated type
             // منع انتشار الحدث لضمان عدم التأثير على التمرير
             if (e) {
               e.stopPropagation();
@@ -52,7 +51,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({ messages, m
 
   return (
     <div className="space-y-4">
-      {messages.map(renderMessage)}
+      {messages.slice().reverse().map(renderMessage)}
       <div ref={messagesEndRef} />
     </div>
   );

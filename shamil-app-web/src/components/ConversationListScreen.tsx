@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, Fragment, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useConversations } from '../hooks/useConversations';
@@ -13,8 +13,7 @@ import SearchDialog from './SearchDialog';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 
-// Component for each conversation item in the list
-const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: string) => void; }> = React.memo(({ conversation, onSelect }) => {
+const ConversationItem: React.FC<{ conversation: Conversation; }> = React.memo(({ conversation }) => {
   const formattedTimestamp = useMemo(() => {
     if (!conversation.timestamp) return '';
     try {
@@ -26,11 +25,7 @@ const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: st
   }, [conversation.timestamp]);
 
   return (
-    // The onClick is now on the li itself
-    <li
-      onClick={() => onSelect(conversation.id)}
-      className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700"
-    >
+    <div className="p-3 sm:p-4 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer transition-colors border-b border-slate-200 dark:border-slate-700">
       <div className="flex items-center space-x-4 rtl:space-x-reverse pointer-events-none">
         <div className="flex-shrink-0">
           <div className="relative inline-flex items-center justify-center w-12 h-12 overflow-hidden bg-slate-200 dark:bg-slate-600 rounded-full">
@@ -56,7 +51,7 @@ const ConversationItem: React.FC<{ conversation: Conversation; onSelect: (id: st
           <div className="flex-shrink-0 w-3 h-3 rounded-full bg-indigo-500"></div>
         )}
       </div>
-    </li>
+    </div>
   );
 });
 
@@ -69,21 +64,11 @@ const ConversationListScreen: React.FC = () => {
 
   const [menu, setMenu] = useState<{ x: number; y: number; conversation: Conversation } | null>(null);
   const [showQRMenu, setShowQRMenu] = useState(false);
-  const longPressTriggered = useRef(false); // Ref to prevent click after long press
-  // تم نقل وظيفة البحث إلى مكون SearchDialog
 
-  // استخدام دوال إجراءات المحادثات
-  const {
-    handleConversationOptions,
-    handleArchiveConversation,
-    handleHideConversation,
-    handleDeleteConversationForAll,
-    closeActionMenu
-  } = useConversationListActions(setConversations, fetchConversations);
+  const { handleConversationOptions, handleArchiveConversation, handleHideConversation, handleDeleteConversationForAll, closeActionMenu } = useConversationListActions(setConversations, fetchConversations);
 
   const handleLongPress = useCallback((target: EventTarget | null) => {
     if (!target) return;
-    longPressTriggered.current = true; // Set flag to indicate a long press occurred
 
     const targetElement = target as HTMLElement;
     const conversationId = targetElement.dataset.id;
@@ -91,23 +76,32 @@ const ConversationListScreen: React.FC = () => {
 
     if (!conversation) return;
 
-    // استخدام دالة التعامل مع خيارات المحادثة الجديدة
     handleConversationOptions(conversation);
 
-    // We need to get the position from the element itself if the event is stale
     const rect = targetElement.getBoundingClientRect();
     setMenu({ x: rect.left, y: rect.bottom, conversation });
 
   }, [conversations, handleConversationOptions]);
 
-  const longPressEvents = useLongPress(handleLongPress, { delay: 500 });
+  const handleSelectConversation = useCallback((conversationId: string) => {
+    navigate(`/chat/${conversationId}`);
+  }, [navigate]);
+
+  const handleConversationClick = (event: React.MouseEvent<HTMLElement> | React.TouchEvent<HTMLElement>) => {
+    const conversationElement = (event.currentTarget as HTMLElement);
+    const conversationId = conversationElement.dataset.id;
+    if (conversationId) {
+        handleSelectConversation(conversationId);
+    }
+  };
+
+  const longPressEvents = useLongPress(handleLongPress, handleConversationClick, { delay: 500 });
 
   const handleCloseMenu = () => {
     setMenu(null);
     closeActionMenu();
   };
 
-  // إغلاق قائمة QR عند النقر خارجها
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showQRMenu && !(event.target as Element).closest('.relative')) {
@@ -121,16 +115,12 @@ const ConversationListScreen: React.FC = () => {
     };
   }, [showQRMenu]);
 
-  // تم نقل وظيفة البحث إلى مكون SearchDialog
-
   const handleGenerateQR = () => {
-    // سيتم تنفيذ هذه الوظيفة في المرحلة الثانية
     setShowQRMenu(false);
     toast.success('سيتم إنشاء رمز QR');
   };
 
   const handleOpenCamera = () => {
-    // سيتم تنفيذ هذه الوظيفة في المرحلة الثانية
     setShowQRMenu(false);
     toast.success('سيتم فتح الكاميرا لقراءة رمز QR');
   };
@@ -139,10 +129,7 @@ const ConversationListScreen: React.FC = () => {
     if (!user) return;
 
     try {
-      // إنشاء محادثة جديدة أو الحصول على محادثة موجودة
-      const { data, error } = await supabase.rpc('create_or_get_conversation_with_user', {
-        p_other_user_id: userId
-      });
+      const { data, error } = await supabase.rpc('create_or_get_conversation_with_user', { p_other_user_id: userId });
 
       if (error) {
         toast.error('لم نتمكن من بدء المحادثة.');
@@ -151,7 +138,6 @@ const ConversationListScreen: React.FC = () => {
       }
 
       if (data) {
-        // الانتقال إلى شاشة المحادثة
         navigate(`/chat/${data}`);
       }
     } catch (err) {
@@ -166,15 +152,6 @@ const ConversationListScreen: React.FC = () => {
     }
   }, [user, navigate]);
 
-  const handleSelectConversation = useCallback((conversationId: string) => {
-    // Check the flag. If a long press just happened, reset the flag and do nothing.
-    if (longPressTriggered.current) {
-      longPressTriggered.current = false;
-      return;
-    }
-    navigate(`/chat/${conversationId}`);
-  }, [navigate]);
-
   const handleCreateNewConversation = useCallback(() => { navigate('/users'); }, [navigate]);
   const handleLogout = useCallback(async () => { /* ... */ }, [signOut, navigate]);
 
@@ -185,7 +162,6 @@ const ConversationListScreen: React.FC = () => {
     <div className="h-screen bg-slate-100 dark:bg-slate-900">
       <main className="w-full h-full flex flex-col bg-white dark:bg-slate-800 shadow-2xl sm:max-w-2xl sm:mx-auto">
 
-        {/* Header */}
         <header className="bg-slate-50 dark:bg-slate-900/70 backdrop-blur-lg p-4 shadow-sm border-b border-slate-200 dark:border-slate-700 z-10">
           <div className="flex justify-between items-center">
             <h1 className="text-xl font-bold text-slate-800 dark:text-slate-50">المحادثات</h1>
@@ -256,19 +232,17 @@ const ConversationListScreen: React.FC = () => {
           </div>
         </header>
 
-        {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           <ul>
             {conversations.map((conversation) => (
-              <div key={conversation.id} data-id={conversation.id} {...longPressEvents}>
-                <ConversationItem conversation={conversation} onSelect={handleSelectConversation} />
-              </div>
+              <li key={conversation.id} data-id={conversation.id} {...longPressEvents}>
+                <ConversationItem conversation={conversation} />
+              </li>
             ))}
           </ul>
         </div>
       </main>
 
-      {/* Context Menu */}
       <Transition as={Fragment} show={!!menu}>
         {/* ... Menu backdrop ... */}
       </Transition>

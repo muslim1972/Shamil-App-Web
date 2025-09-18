@@ -36,7 +36,7 @@ const ChatScreen: React.FC = () => {
   // Menu Handlers
 
 
-  const handleMessageClick = (message: Message, e?: React.MouseEvent) => {
+  const handleMessageClick = (message: Message, e?: React.MouseEvent | React.TouchEvent) => {
     if (!isSelectionMode) return;
 
     // منع انتشار الحدث للحاوية الرئيسية
@@ -145,6 +145,20 @@ const ChatScreen: React.FC = () => {
     return success;
   };
 
+  const clearSelection = () => {
+    setSelectedMessages([]);
+    setIsSelectionMode(false);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isSelectionMode) {
+      const clickedOnMessage = (e.target as HTMLElement).closest('[data-id]');
+      if (!clickedOnMessage) {
+        clearSelection();
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {!isOnline && (
@@ -154,22 +168,10 @@ const ChatScreen: React.FC = () => {
       <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
 
       <div
-        className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col justify-end"
+        className="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-gray-100 flex flex-col-reverse min-h-0"
         id="messages-container"
-        onClick={(e) => {
-          // Only deselect if clicking directly on the container, not on a message
-          if (isSelectionMode && e.target === e.currentTarget) {
-            setSelectedMessages([]);
-            setIsSelectionMode(false);
-          }
-        }}
-        onTouchStart={(e) => {
-          // Only deselect if touching directly on the container, not on a message
-          if (isSelectionMode && e.target === e.currentTarget) {
-            setSelectedMessages([]);
-            setIsSelectionMode(false);
-          }
-        }}
+        onClick={handleContainerClick}
+        onTouchStart={handleContainerClick}
       >
         {loading ? (
           <div className="flex items-center justify-center h-full">
@@ -214,59 +216,46 @@ const ChatScreen: React.FC = () => {
       </div>
 
       {/* Selection Mode Toolbar */}
-      {isSelectionMode && (
-        <div className="bg-white border-t border-gray-200 p-3 flex justify-between items-center">
-          <div className="text-sm font-medium text-gray-700">
-            {selectedMessages.length} رسالة محددة
-          </div>
-          <div className="flex space-x-4">
-            <button
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-              onClick={() => {
-                setSelectedMessages([]);
-                setIsSelectionMode(false);
-              }}
-            >
-              <Trash2 size={20} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-              onClick={() => {
-                // سيتم تنفيذ منطق التثبيت لاحقاً
-                setSelectedMessages([]);
-                setIsSelectionMode(false);
-              }}
-            >
-              <Pin size={20} />
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-              onClick={() => {
-                // سيتم تنفيذ منطق إعادة التوجيه لاحقاً
-                setSelectedMessages([]);
-                setIsSelectionMode(false);
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-            <button
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
-              onClick={() => {
-                // سيتم تنفيذ منطق التعديل لاحقاً
-                setSelectedMessages([]);
-                setIsSelectionMode(false);
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-            </button>
-          </div>
+      <div
+        className={`bg-white border-t border-gray-200 p-3 flex justify-between items-center ${
+          isSelectionMode ? '' : 'invisible'
+        }`}
+      >
+        <div className="text-sm font-medium text-gray-700">
+          {selectedMessages.length} رسالة محددة
         </div>
-      )}
+        <div className="flex space-x-4">
+          <button
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+            onClick={clearSelection}
+          >
+            <Trash2 size={20} />
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+            onClick={clearSelection}
+          >
+            <Pin size={20} />
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+            onClick={clearSelection}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+          <button
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600"
+            onClick={clearSelection}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
 
     </div>
