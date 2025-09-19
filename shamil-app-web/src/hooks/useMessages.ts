@@ -142,6 +142,20 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
                 if (currentMessages.some(m => m.id === formattedNewMessage.id)) {
                     return currentMessages; // Already exists, do nothing.
                 }
+                
+                // Check if there's a pending message with the same content
+                const pendingMessageWithSameContent = currentMessages.find(msg => 
+                  msg.senderId === user?.id && 
+                  msg.text === formattedNewMessage.text && 
+                  msg.status === 'pending'
+                );
+                
+                if (pendingMessageWithSameContent) {
+                  // Replace the pending message with the real one
+                  return currentMessages.map(msg => 
+                    msg.id === pendingMessageWithSameContent.id ? formattedNewMessage : msg
+                  );
+                }
               }
               return [...currentMessages, formattedNewMessage];
             });
@@ -195,7 +209,21 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
         status: 'pending',
       };
 
-      setMessages((currentMessages) => [...currentMessages, optimisticMessage]);
+      // Use functional update to ensure we're working with the latest state
+      setMessages((currentMessages) => {
+        // Check if a message with similar content already exists (to prevent duplicates)
+        const isDuplicate = currentMessages.some(msg => 
+          msg.senderId === user?.id && 
+          msg.text === text.trim() && 
+          msg.status === 'pending'
+        );
+        
+        if (isDuplicate) {
+          return currentMessages; // Don't add duplicate
+        }
+        
+        return [...currentMessages, optimisticMessage];
+      });
 
       try {
         const { data, error } = await supabase.from('messages').insert({
@@ -208,13 +236,22 @@ export const useChatMessages = ({ conversationId }: UseChatMessagesProps) => {
         if (error) throw error;
 
         // Update the message from pending to sent
-        setMessages((currentMessages) =>
-          currentMessages.map((msg) =>
+        setMessages((currentMessages) => {
+          // First, check if a message with the final ID already exists
+          const existingMessage = currentMessages.find(msg => msg.id === data.id);
+          
+          if (existingMessage) {
+            // If it exists, just remove the temporary one
+            return currentMessages.filter(msg => msg.id !== tempId);
+          }
+          
+          // Otherwise, update the temporary message
+          return currentMessages.map((msg) =>
             msg.id === tempId
               ? { ...msg, id: data.id, timestamp: new Date(data.created_at).toISOString(), status: 'sent' }
               : msg
-          )
-        );
+          );
+        });
 
         // Also update user_conversation_settings
         await supabase

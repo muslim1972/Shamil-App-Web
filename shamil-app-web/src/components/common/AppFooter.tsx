@@ -43,7 +43,7 @@ export const AppFooter: React.FC = () => {
   };
 
   return (
-    <div className="bg-white border-t border-gray-200 p-1 flex justify-around items-center min-h-[50px]">
+    <div className="bg-white border-t border-gray-200 p-1 flex justify-around items-center min-h-[35px]">
       {selectionMode === 'none' ? (
         // Default navigation icons
         <>

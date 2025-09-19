@@ -92,7 +92,7 @@ export const MessageForm: React.FC<MessageFormProps> = ({
 
   return (
     <form
-      className={`bg-white border-t border-gray-200 p-4 relative ${disabled ? 'opacity-60' : ''}`}
+      className={`bg-white border-t border-gray-200 p-2 relative ${disabled ? 'opacity-60' : ''}`}
       onKeyDown={handleKeyDown}
     >
       <AttachmentMenu

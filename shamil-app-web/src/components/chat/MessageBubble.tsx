@@ -94,14 +94,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = React.memo(({ message
             </div>
         );
     }
-    return <p>{message.text}</p>;
+    return <p style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}>{message.text}</p>;
   };
 
   return (
     <div
       {...longPressEvents}
       data-id={message.id}
-      className={`${message.message_type === 'forwarded_block' ? 'w-full' : 'max-w-xs lg:max-w-md'} px-4 py-2 rounded-lg ${
+      className={`${message.message_type === 'forwarded_block' ? 'w-full' : 'max-w-xs md:max-w-md lg:max-w-lg'} px-4 py-2 rounded-lg ${
       isOwnMessage
         ? 'bg-indigo-500 text-white'
         : 'bg-white text-gray-800 shadow-sm'

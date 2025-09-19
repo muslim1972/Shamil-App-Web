@@ -54,7 +54,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div className="flex flex-col px-2">
-      <div className="flex items-center">
+      <div className="flex items-center justify-center">
         <button
           type="button"
           onClick={onAttachmentClick}
@@ -66,10 +66,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           }`}
           aria-label="إرفاق ملف"
         >
-          <Paperclip size={24} className="rotate-45" />
+          <Paperclip size={19} className="rotate-135" />
         </button>
 
-        <div className="flex-1 relative mx-2 min-w-0">
+        <div className="flex-1 relative mx-2 min-w-0 mt-1">
           <textarea
             ref={inputRef}
             value={newMessage}
@@ -77,7 +77,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder="اكتب رسالة..."
             rows={1}
-            className={`w-full border rounded-2xl py-2 px-4 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${
+            className={`w-full border rounded-sm py-1.6 px-4 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${
               isTextTooLong
                 ? 'border-red-500 focus:ring-red-500'
                 : 'border-gray-300 focus:ring-indigo-500'
@@ -127,14 +127,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               type="button"
               onClick={onSendMessage}
               disabled={disabled || isTextTooLong || isRecording}
-              className={`rounded-full p-3 flex-shrink-0 transition-all ${
+              className={`rounded-full p-[0.4rem] flex-shrink-0 transition-all ${
                 disabled || isTextTooLong || isRecording
                   ? 'bg-gray-400 cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
               } text-white`}
               aria-label="إرسال الرسالة"
             >
-              <Send size={20} />
+              <Send size={16} />
             </button>
           </div>
         ) : (
@@ -142,14 +142,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="button"
             onClick={onStartRecording}
             disabled={isUploading || isRecording || disabled}
-            className={`rounded-full p-3 flex-shrink-0 transition-all relative group ${
+            className={`rounded-full p-[0.4rem] flex-shrink-0 transition-all relative group ${
               disabled || isUploading || isRecording
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
             } text-white`}
             aria-label="تسجيل رسالة صوتية"
           >
-            <Mic size={20} />
+            <Mic size={16} />
             <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-black text-white text-xs rounded py-1 px-2 whitespace-nowrap z-50">
               اضغط لتسجيل رسالة صوتية
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black"></div>

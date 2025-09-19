@@ -188,7 +188,7 @@ const ChatScreen: React.FC = () => {
   }, [lastTriggeredAction, handleDeleteForMe, handleDeleteForEveryone, handlePinMessage, handleForwardMessages]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50" onClick={handleContainerClick}>
+    <div className="flex flex-col h-full bg-gray-50" onClick={handleContainerClick}>
       <ChatHeader displayConversationName={displayConversationName} onBack={handleBack} />
 
       {pinnedMessage && (
