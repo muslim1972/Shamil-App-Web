@@ -4,12 +4,9 @@ import { supabase } from '../services/supabase';
 export const useArchivedConversationListActions = (setArchivedConversations: React.Dispatch<React.SetStateAction<any[]>>, fetchArchivedConversations: () => Promise<void>) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<any | null>(null);
-  const [isActionMenuVisible, setIsActionMenuVisible] = useState(false);
 
   const handleDbOperation = useCallback(async (operation: () => Promise<{ error: any }>, errorMessage: string, operationType: string) => {
     setIsProcessing(true);
-    // إغلاق القائمة قبل بدء العملية
-    setIsActionMenuVisible(false);
 
     try {
       const { error } = await operation();
@@ -33,11 +30,6 @@ export const useArchivedConversationListActions = (setArchivedConversations: Rea
       setSelectedConversation(null); // مسح المحادثة المحددة
     }
   }, [fetchArchivedConversations, selectedConversation, setArchivedConversations]);
-
-  const handleConversationOptions = useCallback((conversation: any) => {
-    setSelectedConversation(conversation);
-    setIsActionMenuVisible(true);
-  }, []);
 
   const handleUnarchiveConversation = useCallback(() => {
     if (!selectedConversation) return;
@@ -80,19 +72,11 @@ export const useArchivedConversationListActions = (setArchivedConversations: Rea
     }
   }, [selectedConversation, handleDbOperation]);
 
-  const closeActionMenu = useCallback(() => {
-    setIsActionMenuVisible(false);
-    setSelectedConversation(null);
-  }, []);
-
   return {
     isProcessing,
     selectedConversation,
-    isActionMenuVisible,
-    handleConversationOptions,
     handleUnarchiveConversation,
     handleHideConversation,
     handleDeleteConversationForAll,
-    closeActionMenu
   };
 };

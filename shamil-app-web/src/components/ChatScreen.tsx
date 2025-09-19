@@ -175,6 +175,10 @@ const ChatScreen: React.FC = () => {
         handleDeleteForMe();
       } else if (lastTriggeredAction.type === 'deleteForAll') {
         handleDeleteForEveryone();
+      } else if (lastTriggeredAction.type === 'deleteConversation') {
+        handleDeleteForMe();
+      } else if (lastTriggeredAction.type === 'deleteConversationForAll') {
+        handleDeleteForEveryone();
       } else if (lastTriggeredAction.type === 'pin') {
         handlePinMessage();
       } else if (lastTriggeredAction.type === 'forward') {

@@ -12,7 +12,7 @@ interface GlobalUIState {
   toggleSelectedItem: (item: any, type: 'message' | 'conversation') => void;
   
   // Actions to be triggered by the footer, handled by respective screens
-  triggerAction: (actionType: 'deleteForMe' | 'deleteForAll' | 'pin' | 'forward' | 'deleteConversation' | 'archiveConversation') => void;
+  triggerAction: (actionType: 'deleteForMe' | 'deleteForAll' | 'pin' | 'forward' | 'deleteConversation' | 'deleteConversationForAll' | 'archiveConversation') => void;
   lastTriggeredAction: { type: string; timestamp: number } | null;
   clearLastTriggeredAction: () => void;
 }
