@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
+import { enhancedSignIn, enhancedSignUp } from '../services/network_fix';
+import { signInWithAlternativeClient, signUpWithAlternativeClient } from '../services/alternative_network_fix';
 import type { Session, User } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -56,20 +58,73 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // محاولة تسجيل الدخول باستخدام العميل الأصلي أولاً
+    let response = await enhancedSignIn(email, password);
+
+    // إذا فشل العميل الأصلي، جرب العميل البديل
+    if (response.error && response.error.message.includes('Cannot connect to server')) {
+      console.log('محاولة تسجيل الدخول باستخدام العميل البديل...');
+      alert('جاري محاولة الاتصال بطريقة بديلة...');
+
+      try {
+        response = await signInWithAlternativeClient(email, password);
+      } catch (altError: any) {
+        console.log('فشل العميل البديل أيضاً:', altError);
+        response = { error: { message: 'فشل جميع محاولات الاتصال بالخادم' } };
+      }
+    }
+
+    // التحقق من وجود خاصية data في الاستجابة قبل الوصول إليها
+    const data = 'data' in response ? response.data : null;
+    const error = response.error;
     if (error) throw error;
     return data;
   };
 
   const signUp = async (email: string, password: string, name: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    console.log('بدء عملية إنشاء حساب جديد...');
+    
+    // محاولة إنشاء الحساب باستخدام العميل الأصلي أولاً
+    console.log('محاولة إنشاء الحساب باستخدام العميل الأصلي...');
+    let response = await enhancedSignUp(
       email,
       password,
-      options: {
-        data: { name },
-      },
-    });
-    if (error) throw error;
+      { data: { username: name } }
+    );
+    
+    
+
+    // إذا فشل العميل الأصلي، جرب العميل البديل
+    if (response.error && 
+        (response.error.message.includes('Cannot connect to server') || 
+         response.error.message.includes('Network request failed') ||
+         response.error.message.includes('fetch'))) {
+      console.log('محاولة إنشاء الحساب باستخدام العميل البديل...');
+      alert('جاري محاولة الاتصال بطريقة بديلة...');
+
+      try {
+        response = await signUpWithAlternativeClient(
+          email,
+          password,
+          { data: { username: name } }
+        );
+        console.log('نتيجة المحاولة الثانية:', response);
+      } catch (altError: any) {
+        console.log('فشل العميل البديل أيضاً:', altError);
+        response = { error: { message: 'فشل جميع محاولات الاتصال بالخادم' } };
+      }
+    }
+
+    // التحقق من وجود خاصية data في الاستجابة قبل الوصول إليها
+    const data = 'data' in response ? response.data : null;
+    const error = response.error;
+    
+    if (error) {
+      console.error('خطأ نهائي في إنشاء الحساب:', error);
+      throw error;
+    }
+    
+    console.log('تم إنشاء الحساب بنجاح:', data);
     return data;
   };
 

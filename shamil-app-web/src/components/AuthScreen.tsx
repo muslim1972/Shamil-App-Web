@@ -13,8 +13,30 @@ const AuthScreen: React.FC = () => {
 
   const { signIn, signUp } = useAuth();
 
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(String(email).toLowerCase());
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // التحقق من صحة البيانات قبل الإرسال
+    if (!validateEmail(email)) {
+      setError('الرجاء إدخال بريد إلكتروني صالح');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل');
+      return;
+    }
+
+    if (!isLogin && name.trim().length < 3) {
+      setError('يجب أن يتكون الاسم من 3 أحرف على الأقل');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -25,15 +47,15 @@ const AuthScreen: React.FC = () => {
       }
       // On success, the AuthProvider will handle navigation
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(err.message || 'فشلت المصادقة');
     } finally {
       setLoading(false);
     }
   };
 
-  const isSubmitDisabled = isLogin 
-    ? password.length < 6 || loading 
-    : loading;
+  const isSubmitDisabled = isLogin
+    ? !validateEmail(email) || password.length < 6 || loading
+    : !validateEmail(email) || password.length < 6 || name.trim().length < 3 || loading;
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
